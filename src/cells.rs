@@ -1,60 +1,100 @@
+use ndarray::Array2;
+use rand::{thread_rng, Rng};
+use std::{cell::Cell, fmt::Display, ops::Deref};
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Cell {
+pub enum State {
     Dead,
     Alive,
 }
 
-#[derive(Clone, Debug)]
-pub struct Board {
-    pub board: Vec<Vec<Cell>>,
-    pub width: usize,
-    pub height: usize,
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Map {
+    pub map: Array2<Cell<State>>,
+    pub rows: usize,
+    pub cols: usize,
 }
 
-impl Board {
-    pub fn new(width: usize, height: usize) -> Self {
-        let mut col = Vec::with_capacity(height);
-        let mut board = Vec::with_capacity(width);
+impl Map {
+    pub fn new(rows: usize, cols: usize) -> Self {
+        let map = Array2::from_elem((rows, cols), Cell::new(State::Dead));
+        Self { map, rows, cols }
+    }
 
-        col.fill(Cell::Dead);
-        board.fill(col);
+    pub fn update(&mut self) {
+        let previous = self.clone();
+        for (next, prev) in self
+            .windows((3, 3))
+            .into_iter()
+            .zip(previous.windows((3, 3)))
+        {
+            let count = prev.iter().filter(|x| x.get() == State::Alive).count();
 
-        Self {
-            board,
-            width,
-            height,
+            let cell = next.get((1, 1)).unwrap();
+
+            match cell.get() {
+                State::Dead => {
+                    if count == 3 {
+                        cell.set(State::Alive);
+                    }
+                }
+                State::Alive => {
+                    if count < 2 || count > 3 {
+                        cell.set(State::Dead);
+                    }
+                }
+            }
         }
     }
 
-    pub fn update_board() {
-        todo!()
-    }
-
-    fn get_neighbors(&self, x: usize, y: usize) -> usize {
-        let mut count = 0;
-
-        let x_set = if x == 0 {
-            [0, 1, self.width - 1]
-        } else if x == self.width - 1 {
-            [x - 1, x, 0]
-        } else {
-            [x - 1, x, x + 1]
-        };
-
-        let y_set = if y == 0 {
-            [0, 1, self.height - 1]
-        } else if y == self.height - 1 {
-            [y - 1, y, 0]
-        } else {
-            [y - 1, y, y + 1]
-        };
-
-        for (x, y) in x_set.iter().zip(y_set.iter()) {
-            if let Cell::Alive = self.board[*x][*y] {
-                count += 1;
+    pub fn randomize(&mut self, val: f64) {
+        let mut rng = thread_rng();
+        for cell in self.map.iter() {
+            if rng.gen::<f64>() < val {
+                cell.set(State::Alive)
+            } else {
+                cell.set(State::Dead)
             }
         }
 
-        count
+        let walls = vec![
+            self.row(0),
+            self.row(self.rows - 1),
+            self.column(0),
+            self.column(self.cols - 1),
+        ];
+
+        for wall in walls {
+            for cell in wall.iter() {
+                cell.set(State::Dead)
+            }
+        }
+    }
+}
+
+impl Deref for Map {
+    type Target = Array2<Cell<State>>;
+    fn deref(&self) -> &Self::Target {
+        &self.map
+    }
+}
+
+impl Display for Map {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let map: String = self
+            .outer_iter()
+            .into_iter()
+            .map(|row| {
+                row.iter()
+                    .map(|x| match x.get() {
+                        State::Dead => ' ',
+                        State::Alive => 'o',
+                    })
+                    .collect::<String>()
+            })
+            .collect::<Vec<String>>()
+            .join("\n");
+
+        write!(f, "{map}")
     }
 }
