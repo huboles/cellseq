@@ -16,9 +16,13 @@ pub struct Map {
 }
 
 impl Map {
-    pub fn new(rows: usize, cols: usize) -> Self {
-        let map = Array2::from_elem((rows, cols), Cell::new(State::Dead));
-        Self { map, rows, cols }
+    pub fn new(x: usize, y: usize) -> Self {
+        let map = Array2::from_elem((y, x), Cell::new(State::Dead));
+        Self {
+            map,
+            cols: x,
+            rows: y,
+        }
     }
 
     pub fn update(&mut self) {
