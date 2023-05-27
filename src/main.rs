@@ -1,16 +1,10 @@
 use cellseq::*;
+use eyre::Result;
 
-fn main() {
-    let mut map = Map::new(32, 64);
-    map.randomize(0.5);
+fn main() -> Result<()> {
+    let mut map = Map::new(48, 24);
+    map.randomize(0.75);
 
-    loop {
-        map.update();
-
-        std::process::Command::new("clear").status().unwrap();
-
-        println!("{map}");
-
-        std::thread::sleep(std::time::Duration::from_millis(1000));
-    }
+    run_map(&mut map, (10, 5), 300)?;
+    Ok(())
 }

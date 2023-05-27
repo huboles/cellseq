@@ -22,7 +22,8 @@ impl Map {
     }
 
     pub fn update(&mut self) {
-        let previous = self.clone();
+        let mut previous = self.clone();
+        previous.wrap_walls();
         for (next, prev) in self
             .windows((3, 3))
             .into_iter()
@@ -39,7 +40,7 @@ impl Map {
                     }
                 }
                 State::Alive => {
-                    if count < 2 || count > 3 {
+                    if count < 3 || count > 4 {
                         cell.set(State::Dead);
                     }
                 }
@@ -50,24 +51,23 @@ impl Map {
     pub fn randomize(&mut self, val: f64) {
         let mut rng = thread_rng();
         for cell in self.map.iter() {
-            if rng.gen::<f64>() < val {
+            if rng.gen::<f64>() > val {
                 cell.set(State::Alive)
             } else {
                 cell.set(State::Dead)
             }
         }
+    }
 
-        let walls = vec![
-            self.row(0),
-            self.row(self.rows - 1),
-            self.column(0),
-            self.column(self.cols - 1),
-        ];
+    fn wrap_walls(&mut self) {
+        for (bottom, top) in self.row(self.rows - 1).iter().zip(self.row(0).iter()) {
+            bottom.set(State::Dead);
+            top.set(State::Dead);
+        }
 
-        for wall in walls {
-            for cell in wall.iter() {
-                cell.set(State::Dead)
-            }
+        for (right, left) in self.column(self.cols - 1).iter().zip(self.column(0).iter()) {
+            right.set(State::Dead);
+            left.set(State::Dead);
         }
     }
 }
@@ -76,25 +76,5 @@ impl Deref for Map {
     type Target = Array2<Cell<State>>;
     fn deref(&self) -> &Self::Target {
         &self.map
-    }
-}
-
-impl Display for Map {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let map: String = self
-            .outer_iter()
-            .into_iter()
-            .map(|row| {
-                row.iter()
-                    .map(|x| match x.get() {
-                        State::Dead => ' ',
-                        State::Alive => 'o',
-                    })
-                    .collect::<String>()
-            })
-            .collect::<Vec<String>>()
-            .join("\n");
-
-        write!(f, "{map}")
     }
 }
