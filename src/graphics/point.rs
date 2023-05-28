@@ -1,4 +1,5 @@
 use crossterm::style::{Attribute, Color};
+use eyre::Result;
 use std::ops::{Add, Div, Mul, Sub};
 
 pub struct Pixel {
@@ -18,6 +19,11 @@ pub struct Point {
 impl Point {
     pub fn new(x: usize, y: usize) -> Self {
         Self { x, y }
+    }
+
+    pub fn u16_offset(&self, offset: Point) -> Result<(u16, u16)> {
+        let output = *self + offset;
+        Ok((output.x.try_into()?, output.y.try_into()?))
     }
 }
 

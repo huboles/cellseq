@@ -1,4 +1,5 @@
 use crate::{Map, Mask, Point};
+use crossterm::style::{Attribute, Color};
 use ndarray::Array2;
 use rand::{thread_rng, Rng};
 use std::{cell::Cell, ops::Deref};
@@ -84,8 +85,20 @@ impl Map<Cell<State>> for World {
         self.nrows()
     }
 
-    fn graphics(&self) -> (char, char) {
+    fn characters(&self) -> (char, char) {
         ('●', '◌')
+    }
+
+    fn fg_colors(&self) -> (Color, Color) {
+        (Color::Green, Color::Grey)
+    }
+
+    fn bg_colors(&self) -> (Color, Color) {
+        (Color::Black, Color::Black)
+    }
+
+    fn styles(&self) -> (Attribute, Attribute) {
+        (Attribute::Bold, Attribute::Reset)
     }
 
     fn try_point(&self, point: Point) -> bool {

@@ -1,4 +1,5 @@
 use crate::Point;
+use crossterm::style::{Attribute, Color};
 use ndarray::Array2;
 use std::ops::Deref;
 
@@ -7,7 +8,10 @@ pub trait Map<T> {
     fn get_point(&self, point: Point) -> Option<T>;
     fn x_size(&self) -> usize;
     fn y_size(&self) -> usize;
-    fn graphics(&self) -> (char, char);
+    fn characters(&self) -> (char, char);
+    fn fg_colors(&self) -> (Color, Color);
+    fn bg_colors(&self) -> (Color, Color);
+    fn styles(&self) -> (Attribute, Attribute);
     fn update(&mut self);
 }
 
@@ -47,8 +51,20 @@ impl<T: Clone> Map<T> for Mask<T> {
         self.get((point.y, point.x)).cloned()
     }
 
-    fn graphics(&self) -> (char, char) {
+    fn characters(&self) -> (char, char) {
         ('■', '□')
+    }
+
+    fn fg_colors(&self) -> (Color, Color) {
+        (Color::White, Color::Grey)
+    }
+
+    fn bg_colors(&self) -> (Color, Color) {
+        (Color::Black, Color::Black)
+    }
+
+    fn styles(&self) -> (Attribute, Attribute) {
+        (Attribute::Bold, Attribute::Reset)
     }
 
     fn update(&mut self) {}
