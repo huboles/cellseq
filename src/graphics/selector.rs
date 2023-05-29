@@ -1,16 +1,12 @@
 use crate::Point;
 use crossterm::{
-    cursor,
-    event::{poll, read, Event, KeyCode, KeyEvent, KeyModifiers},
-    execute, queue,
+    cursor, queue,
     style::{self, Attribute, Color},
-    terminal,
 };
 use eyre::Result;
 use std::{
     io::stdout,
     ops::{Deref, DerefMut},
-    time::Duration,
 };
 
 pub struct Cursor {
@@ -56,60 +52,5 @@ impl Cursor {
             style::Print(self.char.to_string())
         )?;
         Ok(())
-    }
-
-    pub fn update(&mut self, event: KeyEvent) -> Result<()> {
-        let key = event.code;
-        match event.modifiers {
-            KeyModifiers::NONE => match key {
-                KeyCode::Char(c) => match c {
-                    'j' => self.y += 1,
-                    'k' => {
-                        if self.y != 0 {
-                            self.y -= 1
-                        }
-                    }
-                    'h' => {
-                        if self.x != 0 {
-                            self.x -= 1
-                        }
-                    }
-                    'l' => self.x += 1,
-                    _ => {}
-                },
-                _ => {}
-            },
-            KeyModifiers::CONTROL => match key {
-                KeyCode::Char(c) => match c {
-                    'c' => std::process::exit(0),
-                    _ => {}
-                },
-                _ => {}
-            },
-            KeyModifiers::ALT => match key {
-                _ => {}
-            },
-            KeyModifiers::SHIFT => match key {
-                _ => {}
-            },
-            _ => {}
-        };
-        Ok(())
-    }
-}
-
-pub fn move_cursor() -> Result<()> {
-    let mut cursor = Cursor::new();
-    loop {
-        if poll(Duration::from_millis(10))? {
-            execute!(stdout(), terminal::Clear(terminal::ClearType::All))?;
-            match read()? {
-                Event::Key(event) => {
-                    cursor.update(event)?;
-                }
-                _ => continue,
-            }
-        }
-        cursor.render()?;
     }
 }

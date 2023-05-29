@@ -1,7 +1,9 @@
+mod keys;
 mod map;
 mod point;
 mod selector;
 
+pub use keys::*;
 pub use map::*;
 pub use point::*;
 pub use selector::*;
@@ -50,7 +52,6 @@ pub fn draw_frame<T>(map: &mut impl Map<T>, offset: Point) -> Result<()> {
             }
         }
     }
-    stdout().flush()?;
     Ok(())
 }
 
@@ -61,6 +62,8 @@ pub fn run_map<T>(map: &mut impl Map<T>, offset: Point, time: Duration) -> Resul
         execute!(stdout(), terminal::Clear(terminal::ClearType::All))?;
 
         draw_frame(map, offset)?;
+
+        stdout().flush()?;
 
         thread::sleep(time);
     }
@@ -77,6 +80,7 @@ pub fn loop_map<T>(
         for _ in 0..steps {
             execute!(stdout(), terminal::Clear(terminal::ClearType::All))?;
             draw_frame(&mut tmp, offset)?;
+            stdout().flush()?;
             tmp.update();
             thread::sleep(time);
         }

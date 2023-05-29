@@ -22,9 +22,3 @@ impl Song {
         }
     }
 }
-
-pub enum Transport {
-    Pause,
-    Play,
-    FastForward(usize),
-}
