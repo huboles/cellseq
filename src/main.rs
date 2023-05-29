@@ -8,10 +8,10 @@ fn main() -> Result<()> {
     let mut map = World::new(74, 32);
     map.randomize(0.75);
 
-    let time = bpm_to_ms(120);
+    let time = bpm_to_ms(100);
 
-    // loop_map(&mut map, Point::new(10, 2), time, 32)?;
+    run_map(&mut map, Point::new(10, 2), time)?;
     // edit_mask(&mask, (10, 5))?;
-    move_cursor()?;
+    // move_cursor()?;
     Ok(())
 }

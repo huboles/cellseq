@@ -33,19 +33,18 @@ impl World {
     }
 
     fn wrap_walls(&mut self) {
-        for (bottom, top) in self.row(self.y_size() - 1).iter().zip(self.row(0).iter()) {
-            bottom.set(State::Dead);
-            top.set(State::Dead);
+        macro_rules! wrap {
+            ($portal:expr,$wall:expr) => {
+                for (portal, wall) in $portal.iter().zip($wall) {
+                    portal.set(wall.get())
+                }
+            };
         }
 
-        for (right, left) in self
-            .column(self.x_size() - 1)
-            .iter()
-            .zip(self.column(0).iter())
-        {
-            right.set(State::Dead);
-            left.set(State::Dead);
-        }
+        wrap!(self.column(0), self.column(self.x_size() - 2));
+        wrap!(self.column(self.x_size() - 1), self.column(1));
+        wrap!(self.row(0), self.row(self.y_size() - 2));
+        wrap!(self.row(self.y_size() - 1), self.row(1));
     }
 }
 
