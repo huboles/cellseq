@@ -1,5 +1,9 @@
 use crate::{Map, Mask, Point};
-use crossterm::style::{Attribute, Color};
+use crossterm::style::{
+    Attribute, Attributes,
+    Color::{Black, Green, Grey},
+    Colors,
+};
 use ndarray::Array2;
 use rand::{thread_rng, Rng};
 use std::{cell::Cell, ops::Deref};
@@ -88,16 +92,16 @@ impl Map<Cell<State>> for World {
         ('●', '◌')
     }
 
-    fn fg_colors(&self) -> (Color, Color) {
-        (Color::Green, Color::Grey)
+    fn on_colors(&self) -> Colors {
+        Colors::new(Green, Black)
     }
 
-    fn bg_colors(&self) -> (Color, Color) {
-        (Color::Black, Color::Black)
+    fn off_colors(&self) -> Colors {
+        Colors::new(Grey, Black)
     }
 
-    fn styles(&self) -> (Attribute, Attribute) {
-        (Attribute::Bold, Attribute::Reset)
+    fn styles(&self) -> (Attributes, Attributes) {
+        (Attribute::Bold.into(), Attribute::Reset.into())
     }
 
     fn try_point(&self, point: Point) -> bool {

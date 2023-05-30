@@ -2,6 +2,7 @@ use crossterm::style::{Attribute, Color};
 use eyre::Result;
 use std::ops::{Add, Div, Mul, Sub};
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Pixel {
     pub location: Point,
     pub value: char,
