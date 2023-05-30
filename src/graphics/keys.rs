@@ -1,55 +1,6 @@
-use crossterm::{
-    event::{poll, read, Event, KeyCode, KeyEvent, KeyModifiers},
-    execute, queue, terminal,
-};
-use eyre::Result;
-use std::time::Duration;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-pub fn action_loop(speed: usize) -> Result<()> {
-    loop {
-        if poll(Duration::from_millis(speed.try_into()?))? {
-            if let Event::Key(key) = read()? {
-                match key_event(key) {
-                    Action::None => continue,
-                    Action::Exit => crate::exit()?,
-                    x => println!("{:?}", x),
-                }
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum Action {
-    None,
-    Move(Direction),
-    Resize(Direction),
-    Transport(Clock),
-    Channel(usize),
-    Select,
-    SelectArea,
-    Reload,
-    Randomize,
-    Exit,
-    Help,
-}
-
-#[derive(Debug)]
-pub enum Clock {
-    Stop,
-    Start,
-    Pause,
-    Faster(usize),
-    Slower(usize),
-}
-
-#[derive(Debug)]
-pub enum Direction {
-    Up,
-    Down,
-    Left,
-    Right,
-}
+use super::*;
 
 pub fn key_event(event: KeyEvent) -> Action {
     match event.modifiers {
@@ -110,15 +61,7 @@ pub fn match_ctl_key(key: KeyCode) -> Action {
 
 pub fn match_shift_key(key: KeyCode) -> Action {
     match key {
-        KeyCode::Up => Action::Resize(Direction::Up),
-        KeyCode::Down => Action::Resize(Direction::Down),
-        KeyCode::Right => Action::Resize(Direction::Right),
-        KeyCode::Left => Action::Resize(Direction::Left),
         KeyCode::Char(c) => match c {
-            'J' => Action::Resize(Direction::Down),
-            'K' => Action::Resize(Direction::Up),
-            'H' => Action::Resize(Direction::Left),
-            'L' => Action::Resize(Direction::Right),
             'R' => Action::Randomize,
             _ => Action::None,
         },
