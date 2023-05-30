@@ -4,7 +4,7 @@ mod transport;
 pub use scale::*;
 pub use transport::*;
 
-pub type NoteMask = [bool; 12];
+pub type NoteMask = [Option<Note>; 12];
 
 pub struct TimeSignature {
     pub top: usize,
@@ -20,6 +20,7 @@ impl From<(usize, usize)> for TimeSignature {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Note {
     A(Acc),
     B(Acc),
@@ -30,8 +31,9 @@ pub enum Note {
     G(Acc),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Acc {
-    Shp,
-    Nat,
     Flt,
+    Nat,
+    Shp,
 }

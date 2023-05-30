@@ -14,7 +14,6 @@ use super::*;
 pub struct Area {
     pub origin: Point,
     pub max: Point,
-    pub colors: Option<Colors>,
 }
 
 impl From<(Point, Point)> for Area {
@@ -22,7 +21,6 @@ impl From<(Point, Point)> for Area {
         Self {
             origin: value.0,
             max: value.1,
-            colors: None,
         }
     }
 }
@@ -32,12 +30,7 @@ impl Area {
         Self {
             origin: Point::new(x_zero, y_zero),
             max: Point::new(x_max, y_max),
-            colors: None,
         }
-    }
-
-    pub fn set_colors(&mut self, colors: Colors) {
-        self.colors = Some(colors);
     }
 
     pub fn to_u16(&self) -> Result<((u16, u16), (u16, u16))> {
@@ -47,11 +40,19 @@ impl Area {
         ))
     }
 
+    pub fn width(&self) -> usize {
+        self.max.y - self.origin.y
+    }
+
+    pub fn height(&self) -> usize {
+        self.max.x - self.origin.x
+    }
+
     pub fn outline_area(&self) -> Result<()> {
-        let colors = self.colors.unwrap_or(Colors::new(White, Black));
+        let colors = Colors::new(White, Black);
         let ((x_zero, y_zero), (x_max, y_max)) = self.to_u16()?;
 
-        for y in y_zero..=y_max {
+        for y in y_zero + 1..y_max {
             queue!(
                 stdout(),
                 Hide,
@@ -64,7 +65,7 @@ impl Area {
             )?;
         }
 
-        for x in x_zero..=x_max {
+        for x in x_zero + 1..x_max {
             queue!(
                 stdout(),
                 Hide,

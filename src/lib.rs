@@ -1,10 +1,12 @@
 mod cells;
 mod graphics;
 mod music;
+mod state;
 
 pub use cells::*;
 pub use graphics::*;
 pub use music::*;
+pub use state::*;
 
 use eyre::Result;
 use std::time::Duration;

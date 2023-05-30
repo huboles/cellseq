@@ -14,6 +14,8 @@ pub use map::*;
 pub use point::*;
 pub use selector::*;
 
+use super::*;
+
 use crossterm::{
     cursor::{Hide, MoveTo},
     execute, queue,
@@ -27,18 +29,49 @@ use std::{
     time::Duration,
 };
 
-pub struct Cursor {}
+pub fn render_loop(state: &mut GlobalState) -> Result<()> {
+    execute!(stdout(), terminal::Clear(terminal::ClearType::All))?;
 
-pub fn draw_frame<T>(map: &mut impl Map<T>, offset: Point) -> Result<()> {
+    state.layout.draw_outlines()?;
+
+    loop {
+        let tick = state.transport.tick;
+        let timer = std::thread::spawn(move || thread::sleep(tick));
+
+        if !state.transport.running {
+            timer.join().unwrap();
+            continue;
+        }
+
+        state.world.update();
+
+        draw_map(&mut state.world, &state.layout.cells)?;
+        // draw_map(&mut state.mask[0], &state.layout.mask)?;
+
+        timer.join().unwrap();
+
+        stdout().flush()?;
+    }
+}
+
+pub fn draw_map<T>(map: &mut impl Map<T>, area: &Area) -> Result<()> {
+    let ((x_zero, y_zero), (x_max, y_max)) = area.to_u16()?;
+
+    let origin = Point::new(x_zero.into(), y_zero.into());
+
     let (char_on, char_off) = map.characters();
     let on_colors = map.on_colors();
     let off_colors = map.off_colors();
     let (style_on, style_off) = map.styles();
 
-    for x in 1..(map.x_size() - 1) {
-        for y in 1..(map.y_size() - 1) {
+    for x in 0..=(map.x_size()) {
+        for y in 0..=(map.y_size()) {
             let point = Point::new(x, y);
-            let (x_off, y_off) = point.u16_offset(offset)?;
+            let (x_off, y_off) = origin.u16_offset(point)?;
+
+            if x_off <= x_zero || x_off >= x_max || y_off <= y_zero || y_off >= y_max {
+                continue;
+            }
 
             if map.try_point(point) {
                 queue!(
@@ -61,16 +94,19 @@ pub fn draw_frame<T>(map: &mut impl Map<T>, offset: Point) -> Result<()> {
             }
         }
     }
+
+    area.outline_area()?;
+
     Ok(())
 }
 
-pub fn run_map<T>(map: &mut impl Map<T>, offset: Point, time: Duration) -> Result<()> {
+pub fn run_map<T>(map: &mut impl Map<T>, area: &Area, time: Duration) -> Result<()> {
     loop {
         map.update();
 
         execute!(stdout(), terminal::Clear(terminal::ClearType::All))?;
 
-        draw_frame(map, offset)?;
+        draw_map(map, area)?;
 
         stdout().flush()?;
 
@@ -80,7 +116,7 @@ pub fn run_map<T>(map: &mut impl Map<T>, offset: Point, time: Duration) -> Resul
 
 pub fn loop_map<T>(
     map: &mut (impl Map<T> + Clone),
-    offset: Point,
+    area: &Area,
     time: Duration,
     steps: usize,
 ) -> Result<()> {
@@ -88,7 +124,7 @@ pub fn loop_map<T>(
         let mut tmp = map.clone();
         for _ in 0..steps {
             execute!(stdout(), terminal::Clear(terminal::ClearType::All))?;
-            draw_frame(&mut tmp, offset)?;
+            draw_map(&mut tmp, area)?;
             stdout().flush()?;
             tmp.update();
             thread::sleep(time);

@@ -7,6 +7,8 @@ use crossterm::style::{
 use ndarray::Array2;
 use std::ops::Deref;
 
+use super::*;
+
 pub trait Map<T> {
     fn try_point(&self, point: Point) -> bool;
     fn get_point(&self, point: Point) -> Option<T>;
@@ -20,25 +22,25 @@ pub trait Map<T> {
 }
 
 #[derive(Debug, Clone)]
-pub struct Mask<T: Clone> {
-    pub mask: Array2<T>,
+pub struct Mask {
+    pub mask: Array2<Option<Note>>,
 }
 
-impl<T: Clone> Mask<T> {
-    pub fn new(x: usize, y: usize, default: T) -> Self {
-        let mask = Array2::from_elem((y, x), default);
+impl Mask {
+    pub fn new(x: usize, y: usize) -> Self {
+        let mask = Array2::from_elem((y, x), None);
         Self { mask }
     }
 }
 
-impl<T: Clone> Deref for Mask<T> {
-    type Target = Array2<T>;
+impl Deref for Mask {
+    type Target = Array2<Option<Note>>;
     fn deref(&self) -> &Self::Target {
         &self.mask
     }
 }
 
-impl<T: Clone> Map<T> for Mask<T> {
+impl Map<Option<Note>> for Mask {
     fn x_size(&self) -> usize {
         self.ncols()
     }
@@ -51,8 +53,8 @@ impl<T: Clone> Map<T> for Mask<T> {
         self.get((point.y, point.x)).is_some()
     }
 
-    fn get_point(&self, point: Point) -> Option<T> {
-        self.get((point.y, point.x)).cloned()
+    fn get_point(&self, point: Point) -> Option<Option<Note>> {
+        self.get((point.y, point.x)).copied()
     }
 
     fn characters(&self) -> (char, char) {

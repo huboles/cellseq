@@ -1,5 +1,10 @@
 use super::*;
 
+use super::{
+    Acc::{Nat, Shp},
+    Note::{A, B, C, D, E, F, G},
+};
+
 pub enum Scale {
     Ionian,
     Dorian,
@@ -19,38 +24,57 @@ pub enum Scale {
 
 impl Scale {
     pub fn to_notes(&self) -> NoteMask {
-        let mut diatonic: NoteMask = [
-            true, false, true, false, true, true, false, true, false, true, false, true,
+        let octave = [
+            C(Nat),
+            C(Shp),
+            D(Nat),
+            D(Shp),
+            E(Nat),
+            F(Nat),
+            F(Shp),
+            G(Nat),
+            G(Shp),
+            A(Nat),
+            A(Shp),
+            B(Nat),
         ];
 
-        let mut pentatonic: NoteMask = [
-            true, false, true, false, true, false, false, true, false, true, false, false,
-        ];
+        let diatonic = [1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1];
+        let pentatonic = [1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0];
+        let whole_tone = [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0];
+
+        fn mask_scale(notes: &[Note; 12], mask: [u8; 12]) -> NoteMask {
+            let mut output = [None; 12];
+            for (i, (note, mask)) in notes.iter().zip(mask.iter()).enumerate() {
+                if *mask == 1 {
+                    output[i] = Some(*note)
+                }
+            }
+            output
+        }
 
         macro_rules! rotate {
-            ($i:ident,$e:expr) => {{
-                $i.rotate_left($e);
-                $i
+            ($s:expr,$n:expr) => {{
+                $s.rotate_left($n);
+                $s
             }};
         }
 
         match self {
-            Scale::Ionian => diatonic,
-            Scale::Dorian => rotate!(diatonic, 2),
-            Scale::Phrygian => rotate!(diatonic, 4),
-            Scale::Lydian => rotate!(diatonic, 5),
-            Scale::Mixolydian => rotate!(diatonic, 7),
-            Scale::Aeolian => rotate!(diatonic, 9),
-            Scale::Locrian => rotate!(diatonic, 11),
-            Scale::MajPent => pentatonic,
-            Scale::SusEgypt => rotate!(pentatonic, 2),
-            Scale::BlueMinPen => rotate!(pentatonic, 4),
-            Scale::BlueMajPent => rotate!(pentatonic, 7),
-            Scale::MinPent => rotate!(pentatonic, 9),
-            Scale::Chromatic => [true; 12],
-            Scale::WholeTone => [
-                true, false, true, false, true, false, true, false, true, false, true, false,
-            ],
+            Scale::Ionian => mask_scale(&octave, diatonic),
+            Scale::Dorian => rotate!(mask_scale(&octave, diatonic), 2),
+            Scale::Phrygian => rotate!(mask_scale(&octave, diatonic), 4),
+            Scale::Lydian => rotate!(mask_scale(&octave, diatonic), 5),
+            Scale::Mixolydian => rotate!(mask_scale(&octave, diatonic), 7),
+            Scale::Aeolian => rotate!(mask_scale(&octave, diatonic), 9),
+            Scale::Locrian => rotate!(mask_scale(&octave, diatonic), 11),
+            Scale::MajPent => mask_scale(&octave, pentatonic),
+            Scale::SusEgypt => rotate!(mask_scale(&octave, pentatonic), 2),
+            Scale::BlueMinPen => rotate!(mask_scale(&octave, pentatonic), 4),
+            Scale::BlueMajPent => rotate!(mask_scale(&octave, pentatonic), 7),
+            Scale::MinPent => rotate!(mask_scale(&octave, pentatonic), 9),
+            Scale::WholeTone => mask_scale(&octave, whole_tone),
+            Scale::Chromatic => octave.map(|n| Some(n)),
         }
     }
 }

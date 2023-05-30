@@ -1,4 +1,4 @@
-use crate::{Map, Mask, Point};
+use crate::{Map, Point};
 use crossterm::style::{
     Attribute, Attributes,
     Color::{Black, Green, Grey},
@@ -16,12 +16,12 @@ pub enum State {
 
 #[derive(Clone, Debug)]
 pub struct World {
-    pub map: Mask<Cell<State>>,
+    pub map: Array2<Cell<State>>,
 }
 
 impl World {
     pub fn new(x: usize, y: usize) -> Self {
-        let map = Mask::new(x, y, Cell::from(State::Dead));
+        let map = Array2::from_elem((x, y), Cell::from(State::Dead));
         Self { map }
     }
 
