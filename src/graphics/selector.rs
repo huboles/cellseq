@@ -11,7 +11,7 @@ use std::{
 
 use super::*;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Cursor {
     pub position: Point,
     pub color: Colors,
@@ -58,6 +58,7 @@ impl Cursor {
             cursor::MoveTo(offset.x.try_into().unwrap(), offset.y.try_into().unwrap()),
             style::SetAttributes(self.style),
             style::SetColors(self.color),
+            cursor::Show,
             style::Print(self.char.to_string())
         )?;
         Ok(())

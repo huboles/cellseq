@@ -5,6 +5,7 @@ use super::{
     Note::{A, B, C, D, E, F, G},
 };
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Scale {
     Ionian,
     Dorian,

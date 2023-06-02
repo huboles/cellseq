@@ -33,26 +33,24 @@ pub enum Direction {
     Right,
 }
 
-type AMmGS<'a> = Arc<Mutex<&'a mut GlobalState>>;
-
-pub fn action(action: Action, state: AMmGS) -> Result<()> {
+pub fn action(action: Action, state: ArcState) -> Result<()> {
     match action {
         Action::None => Ok(()),
         Action::Exit => exit(),
         Action::Move(direction) => move_cursor(direction, state),
         Action::Clock(clock) => transport_action(clock, state),
-        Action::Channel(_) => Ok(()),
+        Action::Channel(n) => change_channel(n, state),
         Action::Select => Ok(()),
         Action::SelectArea => Ok(()),
         Action::Reload => Ok(()),
         Action::Randomize => Ok(()),
         Action::Help => Ok(()),
         Action::Edit => Ok(()),
-        Action::SwitchPanel => Ok(()),
+        Action::SwitchPanel => switch_panel(state),
     }
 }
 
-fn transport_action(clock: Clock, state: AMmGS) -> Result<()> {
+fn transport_action(clock: Clock, state: ArcState) -> Result<()> {
     let mut state = state.lock().unwrap();
     match clock {
         Clock::Stop => state.transport.running = false,
@@ -64,7 +62,7 @@ fn transport_action(clock: Clock, state: AMmGS) -> Result<()> {
     Ok(())
 }
 
-fn move_cursor(direction: Direction, state: AMmGS) -> Result<()> {
+fn move_cursor(direction: Direction, state: ArcState) -> Result<()> {
     let mut state = state.lock().unwrap();
     match direction {
         Direction::Up => {
@@ -88,5 +86,22 @@ fn move_cursor(direction: Direction, state: AMmGS) -> Result<()> {
             }
         }
     }
+    Ok(())
+}
+
+fn switch_panel(state: ArcState) -> Result<()> {
+    let mut mutex = state.lock().unwrap();
+    mutex.cursor.area = if mutex.cursor.area == mutex.layout.mask {
+        mutex.layout.cells
+    } else {
+        mutex.layout.mask
+    };
+    Ok(())
+}
+
+fn change_channel(channel: usize, state: ArcState) -> Result<()> {
+    let mut mutex = state.lock().unwrap();
+    mutex.channels.0 = channel;
+    draw_map(&mutex.mask[channel], &mutex.layout.mask)?;
     Ok(())
 }

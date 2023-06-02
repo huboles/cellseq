@@ -1,5 +1,6 @@
 use super::*;
 
+#[derive(Clone, Copy, Debug)]
 pub struct Song {
     pub key: Option<Note>,
     pub scale: Option<Scale>,

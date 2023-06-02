@@ -6,6 +6,7 @@ pub use transport::*;
 
 use std::fmt::Display;
 
+#[derive(Clone, Copy, Debug)]
 pub struct TimeSignature {
     pub top: usize,
     pub bottom: usize,

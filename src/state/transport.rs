@@ -7,6 +7,7 @@ use crossterm::{
 };
 use std::io::stdout;
 
+#[derive(Debug, Clone, Copy)]
 pub struct Transport {
     pub running: bool,
     pub bpm: usize,

@@ -2,16 +2,20 @@ mod transport;
 
 pub use transport::*;
 
+use crossbeam::channel::{bounded, Receiver, Sender};
+
 use super::*;
 
+#[derive(Debug, Clone)]
 pub struct GlobalState {
     pub world: World,
     pub layout: Layout,
     pub transport: Transport,
     pub song: Song,
     pub mask: Vec<Mask>,
-    pub channels: Vec<MidiChannel>,
+    pub channels: (usize, Vec<MidiChannel>),
     pub cursor: Cursor,
+    pub update_mask: (Sender<usize>, Receiver<usize>),
 }
 
 impl GlobalState {
@@ -33,14 +37,17 @@ impl GlobalState {
 
         let song = Song::new(None, None);
 
+        let update_mask = bounded::<usize>(0);
+
         Ok(Self {
             world,
             layout,
             transport,
             song,
             mask,
-            channels,
+            channels: (0, channels),
             cursor,
+            update_mask,
         })
     }
 
@@ -49,6 +56,7 @@ impl GlobalState {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
 pub struct MidiChannel {
     pub num: usize,
     pub poly_num: usize,

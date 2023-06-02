@@ -4,6 +4,7 @@ mod keys;
 mod layout;
 mod map;
 mod point;
+mod render;
 mod selector;
 
 pub use actions::*;
@@ -12,13 +13,14 @@ pub use keys::*;
 pub use layout::*;
 pub use map::*;
 pub use point::*;
+pub use render::*;
 pub use selector::*;
 
 use super::*;
 
 use crossterm::{
     cursor::MoveTo,
-    event::{poll, read, Event},
+    event::{read, Event},
     execute, queue,
     style::{Print, SetAttributes, SetColors},
     terminal,
@@ -30,62 +32,6 @@ use std::{
     thread,
     time::Duration,
 };
-
-pub fn render_loop(state: &mut GlobalState) -> Result<()> {
-    execute!(stdout(), terminal::Clear(terminal::ClearType::All))?;
-
-    state.layout.draw_outlines()?;
-
-    let world = Arc::new(Mutex::new(state.world.clone()));
-    let state_arc = Arc::new(Mutex::new(state));
-
-    loop {
-        let arc = Arc::clone(&state_arc);
-        let tick = arc.lock().unwrap().tick();
-        let timer = std::thread::spawn(move || thread::sleep(tick));
-
-        let event = std::thread::spawn(move || {
-            if poll(tick).unwrap() {
-                match read().unwrap() {
-                    Event::Key(key) => key_event(key),
-                    _ => Action::None,
-                }
-            } else {
-                Action::None
-            }
-        });
-
-        let mut maps = std::thread::spawn(|| {});
-        if arc.lock().unwrap().transport.running {
-            let map = world.clone();
-            let mut mask = arc.lock().unwrap().mask.clone();
-            let cell_area = arc.lock().unwrap().layout.cells;
-            let mask_area = arc.lock().unwrap().layout.mask;
-
-            maps = std::thread::spawn(move || {
-                let mut map = map.lock().unwrap();
-                map.update();
-                let tmp = map.clone();
-                draw_map(&tmp, &cell_area).unwrap();
-                mask[0].update();
-                let tmp = mask[0].clone();
-                draw_map(&tmp, &mask_area).unwrap();
-            });
-        }
-
-        let area = arc.lock().unwrap().layout.transport;
-
-        arc.lock().unwrap().transport.render(area)?;
-
-        action(event.join().unwrap(), arc.clone())?;
-        maps.join().unwrap();
-
-        arc.lock().unwrap().cursor.render()?;
-
-        timer.join().unwrap();
-        stdout().flush()?;
-    }
-}
 
 pub fn draw_map<T>(map: &impl Map<T>, area: &Area) -> Result<()> {
     let ((x_zero, y_zero), (x_max, y_max)) = area.to_u16()?;
@@ -126,6 +72,8 @@ pub fn draw_map<T>(map: &impl Map<T>, area: &Area) -> Result<()> {
     }
 
     area.outline_area()?;
+
+    stdout().flush()?;
 
     Ok(())
 }

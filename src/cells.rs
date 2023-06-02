@@ -16,14 +16,14 @@ pub enum State {
     Alive,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct World {
     pub map: Array2<Cell<State>>,
 }
 
 impl World {
     pub fn new(area: Area) -> Self {
-        let map = Array2::from_elem((area.width(), area.height()), Cell::from(State::Dead));
+        let map = Array2::from_elem((area.width(), area.height()), Cell::new(State::Dead));
         Self { map }
     }
 
@@ -31,9 +31,9 @@ impl World {
         let mut rng = thread_rng();
         for cell in self.map.iter() {
             if rng.gen::<f64>() > val {
-                cell.set(State::Alive)
+                cell.set(State::Alive);
             } else {
-                cell.set(State::Dead)
+                cell.set(State::Dead);
             }
         }
     }
@@ -42,7 +42,7 @@ impl World {
         macro_rules! wrap {
             ($portal:expr,$wall:expr) => {
                 for (portal, wall) in $portal.iter().zip($wall) {
-                    portal.set(wall.get())
+                    portal.set(wall.get());
                 }
             };
         }
@@ -110,6 +110,7 @@ impl Map<Cell<State>> for World {
         }
         false
     }
+
     fn get_point(&self, point: Point) -> Option<Cell<State>> {
         self.get((point.y, point.x)).cloned()
     }

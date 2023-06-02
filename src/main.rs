@@ -1,17 +1,18 @@
 use cellseq::*;
-use crossterm::{cursor, execute, terminal};
+use crossterm::{cursor::Hide, execute, terminal};
 use eyre::Result;
+use std::io::stdout;
 
 fn main() -> Result<()> {
     terminal::enable_raw_mode()?;
-    execute!(std::io::stdout(), cursor::Hide)?;
+    execute!(stdout(), Hide)?;
 
     let mut state = GlobalState::build()?;
 
     state.world.randomize(0.75);
     state.mask[0].randomize(0.75, Scale::Aeolian);
 
-    match render_loop(&mut state) {
+    match main_loop(state) {
         Ok(_) => exit(),
         Err(e) => {
             eprintln!("{}", e);
