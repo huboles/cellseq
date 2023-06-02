@@ -4,7 +4,7 @@ mod transport;
 pub use scale::*;
 pub use transport::*;
 
-use std::fmt::Display;
+use std::{fmt::Display, ops::Deref};
 
 #[derive(Clone, Copy, Debug)]
 pub struct TimeSignature {
@@ -47,6 +47,21 @@ impl Display for Note {
         };
 
         write!(f, "{str}")
+    }
+}
+
+impl Note {
+    pub fn to_char(&self) -> char {
+        match self {
+            Note::Off => ' ',
+            Note::A(_) => 'a',
+            Note::B(_) => 'b',
+            Note::C(_) => 'c',
+            Note::D(_) => 'd',
+            Note::E(_) => 'e',
+            Note::F(_) => 'f',
+            Note::G(_) => 'g',
+        }
     }
 }
 

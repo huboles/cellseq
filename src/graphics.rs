@@ -45,29 +45,20 @@ pub fn draw_map<T>(map: &impl Map<T>, area: &Area) -> Result<()> {
     for x in 0..=(map.x_size()) {
         for y in 0..=(map.y_size()) {
             let point = Point::new(x, y);
+            let char = map.draw_point(point).unwrap_or(' ');
             let (x_off, y_off) = origin.u16_offset(point)?;
 
             if x_off <= x_zero || x_off >= x_max || y_off <= y_zero || y_off >= y_max - 1 {
                 continue;
             }
 
-            if map.try_point(point) {
-                queue!(
-                    stdout(),
-                    MoveTo(x_off, y_off),
-                    SetAttributes(style_on),
-                    SetColors(on_colors),
-                    Print(char_on)
-                )?;
-            } else {
-                queue!(
-                    stdout(),
-                    MoveTo(x_off, y_off),
-                    SetAttributes(style_off),
-                    SetColors(off_colors),
-                    Print(char_off)
-                )?;
-            }
+            queue!(
+                stdout(),
+                MoveTo(x_off, y_off),
+                SetAttributes(style_on),
+                SetColors(on_colors),
+                Print(char)
+            )?;
         }
     }
 

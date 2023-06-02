@@ -102,17 +102,16 @@ impl Map<Cell<State>> for World {
         (Attribute::Bold.into(), Attribute::Reset.into())
     }
 
-    fn try_point(&self, point: Point) -> bool {
+    fn draw_point(&self, point: Point) -> Option<char> {
         if let Some(cell) = self.get((point.y, point.x)) {
             if cell.get() == State::Alive {
-                return true;
+                return Some('●');
+            } else {
+                return Some('◌');
             }
+        } else {
+            return None;
         }
-        false
-    }
-
-    fn get_point(&self, point: Point) -> Option<Cell<State>> {
-        self.get((point.y, point.x)).cloned()
     }
 }
 

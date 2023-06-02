@@ -11,8 +11,7 @@ use std::ops::{Deref, DerefMut};
 use super::*;
 
 pub trait Map<T> {
-    fn try_point(&self, point: Point) -> bool;
-    fn get_point(&self, point: Point) -> Option<T>;
+    fn draw_point(&self, point: Point) -> Option<char>;
     fn x_size(&self) -> usize;
     fn y_size(&self) -> usize;
     fn characters(&self) -> (char, char);
@@ -69,16 +68,8 @@ impl Map<Note> for Mask {
         self.nrows()
     }
 
-    fn try_point(&self, point: Point) -> bool {
-        if let Some(note) = self.get((point.y, point.x)) {
-            *note != Note::Off
-        } else {
-            false
-        }
-    }
-
-    fn get_point(&self, point: Point) -> Option<Note> {
-        self.get((point.y, point.x)).copied()
+    fn draw_point(&self, point: Point) -> Option<char> {
+        self.get((point.y, point.x)).map(|n| n.to_char())
     }
 
     fn characters(&self) -> (char, char) {
