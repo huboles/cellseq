@@ -8,6 +8,8 @@ use ndarray::Array2;
 use rand::{thread_rng, Rng};
 use std::{cell::Cell, ops::Deref};
 
+use super::*;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum State {
     Dead,
@@ -20,8 +22,8 @@ pub struct World {
 }
 
 impl World {
-    pub fn new(x: usize, y: usize) -> Self {
-        let map = Array2::from_elem((x, y), Cell::from(State::Dead));
+    pub fn new(area: Area) -> Self {
+        let map = Array2::from_elem((area.width(), area.height()), Cell::from(State::Dead));
         Self { map }
     }
 
@@ -72,7 +74,7 @@ impl Map<Cell<State>> for World {
                     }
                 }
                 State::Alive => {
-                    if count < 3 || count > 4 {
+                    if !(3..=4).contains(&count) {
                         cell.set(State::Dead);
                     }
                 }
@@ -92,12 +94,8 @@ impl Map<Cell<State>> for World {
         ('●', '◌')
     }
 
-    fn on_colors(&self) -> Colors {
-        Colors::new(Green, Black)
-    }
-
-    fn off_colors(&self) -> Colors {
-        Colors::new(Grey, Black)
+    fn colors(&self) -> (Colors, Colors) {
+        (Colors::new(Green, Black), Colors::new(Grey, Black))
     }
 
     fn styles(&self) -> (Attributes, Attributes) {

@@ -11,7 +11,7 @@ pub struct Pixel {
     pub style: Attribute,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct Point {
     pub x: usize,
     pub y: usize,

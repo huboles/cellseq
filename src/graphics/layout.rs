@@ -20,10 +20,10 @@ impl Layout {
         let row: usize = row.into();
 
         let screen = Area::new(0, 0, col, row);
-        let cells = Area::new(1, 1, col / 2 - 5, row / 2 - 2);
-        let mask = Area::new(col / 2 + 5, 1, col - 2, row / 2 - 2);
-        let channels = Area::new(1, row / 2 + 2, col - 2, row - 2);
-        let transport = Area::new(col / 2 - 4, 4, col / 2 + 4, 8);
+        let cells = Area::new(1, 0, col / 2 - 6, row / 2 - 1);
+        let mask = Area::new(col / 2 + 6, 0, col - 2, row / 2 - 1);
+        let channels = Area::new(1, row / 2 + 1, col - 2, row - 1);
+        let transport = Area::new(col / 2 - 5, 4, col / 2 + 5, 9);
 
         Ok(Self {
             screen,

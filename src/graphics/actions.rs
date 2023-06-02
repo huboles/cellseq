@@ -1,14 +1,14 @@
 use super::*;
-use crossterm::event::{poll, read, Event};
 
 #[derive(Debug)]
 pub enum Action {
     None,
     Move(Direction),
-    Transport(Clock),
+    Clock(Clock),
     Channel(usize),
     Select,
     SelectArea,
+    SwitchPanel,
     Reload,
     Randomize,
     Exit,
@@ -33,24 +33,60 @@ pub enum Direction {
     Right,
 }
 
-pub fn action_loop(speed: usize) -> Result<()> {
-    loop {
-        if poll(Duration::from_millis(speed.try_into()?))? {
-            if let Event::Key(key) = read()? {
-                match key_event(key) {
-                    Action::None => continue,
-                    Action::Exit => crate::exit()?,
-                    Action::Move(_direction) => todo!(),
-                    Action::Channel(_channel) => todo!(),
-                    Action::Transport(_clock) => todo!(),
-                    Action::Edit => todo!(),
-                    Action::Select => todo!(),
-                    Action::SelectArea => todo!(),
-                    Action::Reload => todo!(),
-                    Action::Randomize => todo!(),
-                    Action::Help => todo!(),
-                }
+type AMmGS<'a> = Arc<Mutex<&'a mut GlobalState>>;
+
+pub fn action(action: Action, state: AMmGS) -> Result<()> {
+    match action {
+        Action::None => Ok(()),
+        Action::Exit => exit(),
+        Action::Move(direction) => move_cursor(direction, state),
+        Action::Clock(clock) => transport_action(clock, state),
+        Action::Channel(_) => Ok(()),
+        Action::Select => Ok(()),
+        Action::SelectArea => Ok(()),
+        Action::Reload => Ok(()),
+        Action::Randomize => Ok(()),
+        Action::Help => Ok(()),
+        Action::Edit => Ok(()),
+        Action::SwitchPanel => Ok(()),
+    }
+}
+
+fn transport_action(clock: Clock, state: AMmGS) -> Result<()> {
+    let mut state = state.lock().unwrap();
+    match clock {
+        Clock::Stop => state.transport.running = false,
+        Clock::Start => state.transport.running = true,
+        Clock::Pause => state.transport.running = !state.transport.running,
+        Clock::Faster(n) => state.transport.bpm += n,
+        Clock::Slower(n) => state.transport.bpm -= n,
+    };
+    Ok(())
+}
+
+fn move_cursor(direction: Direction, state: AMmGS) -> Result<()> {
+    let mut state = state.lock().unwrap();
+    match direction {
+        Direction::Up => {
+            if state.cursor.position.y > 1 {
+                state.cursor.position.y -= 1
+            }
+        }
+        Direction::Down => {
+            if state.cursor.position.y < state.cursor.area.height() {
+                state.cursor.position.y += 1
+            }
+        }
+        Direction::Left => {
+            if state.cursor.position.x > 1 {
+                state.cursor.position.x -= 1
+            }
+        }
+        Direction::Right => {
+            if state.cursor.position.x < state.cursor.area.width() {
+                state.cursor.position.x += 1
             }
         }
     }
+    Ok(())
 }

@@ -1,3 +1,7 @@
+mod transport;
+
+pub use transport::*;
+
 use super::*;
 
 pub struct GlobalState {
@@ -7,18 +11,25 @@ pub struct GlobalState {
     pub song: Song,
     pub mask: Vec<Mask>,
     pub channels: Vec<MidiChannel>,
+    pub cursor: Cursor,
 }
 
 impl GlobalState {
     pub fn build() -> Result<Self> {
         let layout = Layout::build()?;
 
-        let world = World::new(layout.cells.width(), layout.cells.height() + 1);
+        let world = World::new(layout.cells);
 
-        let channels = Vec::new();
-        let mask = Vec::new();
+        let channels = Vec::with_capacity(10);
+        let mut mask: Vec<Mask> = Vec::with_capacity(10);
+
+        for _ in 0..10 {
+            mask.push(Mask::new(layout.mask));
+        }
 
         let transport = Transport::new(4, 4, 120);
+
+        let cursor = Cursor::new(layout.mask);
 
         let song = Song::new(None, None);
 
@@ -29,31 +40,16 @@ impl GlobalState {
             song,
             mask,
             channels,
+            cursor,
         })
+    }
+
+    pub fn tick(&self) -> Duration {
+        bpm_to_ms(self.transport.bpm)
     }
 }
 
 pub struct MidiChannel {
     pub num: usize,
     pub poly_num: usize,
-}
-
-pub struct Transport {
-    pub running: bool,
-    pub bpm: usize,
-    pub sig: TimeSignature,
-    pub tick: Duration,
-    pub repeat: usize,
-}
-
-impl Transport {
-    pub fn new(top: usize, bottom: usize, bpm: usize) -> Self {
-        Self {
-            sig: TimeSignature { top, bottom },
-            bpm,
-            running: true,
-            repeat: 0,
-            tick: bpm_to_ms(bpm),
-        }
-    }
 }

@@ -13,6 +13,7 @@ use std::time::Duration;
 
 pub fn exit() -> Result<()> {
     crossterm::terminal::disable_raw_mode()?;
+    crossterm::execute!(std::io::stdout(), crossterm::cursor::Show)?;
     std::process::exit(0);
 }
 

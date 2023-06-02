@@ -1,5 +1,5 @@
 use crossterm::{
-    cursor::{Hide, MoveTo},
+    cursor::MoveTo,
     queue,
     style::{
         Color::{Black, White},
@@ -10,7 +10,7 @@ use eyre::Result;
 
 use super::*;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Copy)]
 pub struct Area {
     pub origin: Point,
     pub max: Point,
@@ -52,10 +52,9 @@ impl Area {
         let colors = Colors::new(White, Black);
         let ((x_zero, y_zero), (x_max, y_max)) = self.to_u16()?;
 
-        for y in y_zero + 1..y_max {
+        for y in y_zero + 1..y_max - 1 {
             queue!(
                 stdout(),
-                Hide,
                 MoveTo(x_zero, y),
                 SetColors(colors),
                 Print("┃"),
@@ -68,11 +67,10 @@ impl Area {
         for x in x_zero + 1..x_max {
             queue!(
                 stdout(),
-                Hide,
                 MoveTo(x, y_zero),
                 SetColors(colors),
                 Print("━"),
-                MoveTo(x, y_max),
+                MoveTo(x, y_max - 1),
                 SetColors(colors),
                 Print("━")
             )?;
@@ -81,8 +79,8 @@ impl Area {
         for ((x, y), c) in [
             (x_zero, y_zero),
             (x_max, y_zero),
-            (x_zero, y_max),
-            (x_max, y_max),
+            (x_zero, y_max - 1),
+            (x_max, y_max - 1),
         ]
         .iter()
         .zip(['┏', '┓', '┗', '┛'].iter())
