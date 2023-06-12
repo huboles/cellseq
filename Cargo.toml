@@ -10,4 +10,4 @@ ndarray = "0.15"
 rand = "0.8"
 crossterm = "0.26"
 eyre = "0.6"
-crossbeam = "0.8.2"
+tokio = { version = "1", features = ["full"] }

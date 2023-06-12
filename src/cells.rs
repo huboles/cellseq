@@ -1,12 +1,15 @@
-use crate::{Map, Point};
-use crossterm::style::{
-    Attribute, Attributes,
-    Color::{Black, Green, Grey},
-    Colors,
+use crossterm::{
+    cursor::MoveTo,
+    queue,
+    style::{
+        Attribute::{Bold, Reset},
+        Color::{Black, Green, Grey},
+        ContentStyle, Print, SetStyle,
+    },
 };
 use ndarray::Array2;
 use rand::{thread_rng, Rng};
-use std::{cell::Cell, ops::Deref};
+use std::{cell::Cell, io::stdout, ops::Deref};
 
 use super::*;
 
@@ -19,12 +22,13 @@ pub enum State {
 #[derive(Debug, Clone)]
 pub struct World {
     pub map: Array2<Cell<State>>,
+    pub area: Area,
 }
 
 impl World {
     pub fn new(area: Area) -> Self {
         let map = Array2::from_elem((area.width(), area.height()), Cell::new(State::Dead));
-        Self { map }
+        Self { map, area }
     }
 
     pub fn randomize(&mut self, val: f64) {
@@ -47,15 +51,13 @@ impl World {
             };
         }
 
-        wrap!(self.column(0), self.column(self.x_size() - 2));
-        wrap!(self.column(self.x_size() - 1), self.column(1));
-        wrap!(self.row(0), self.row(self.y_size() - 2));
-        wrap!(self.row(self.y_size() - 1), self.row(1));
+        wrap!(self.column(0), self.column(self.area.width() - 2));
+        wrap!(self.column(self.area.width() - 1), self.column(1));
+        wrap!(self.row(0), self.row(self.area.height() - 2));
+        wrap!(self.row(self.area.height() - 1), self.row(1));
     }
-}
 
-impl Map<Cell<State>> for World {
-    fn update(&mut self) {
+    pub fn update(&mut self) {
         let mut previous = self.clone();
         previous.wrap_walls();
         for (next, prev) in self
@@ -82,36 +84,33 @@ impl Map<Cell<State>> for World {
         }
     }
 
-    fn x_size(&self) -> usize {
-        self.ncols()
-    }
-
-    fn y_size(&self) -> usize {
-        self.nrows()
-    }
-
-    fn characters(&self) -> (char, char) {
-        ('●', '◌')
-    }
-
-    fn colors(&self) -> (Colors, Colors) {
-        (Colors::new(Green, Black), Colors::new(Grey, Black))
-    }
-
-    fn styles(&self) -> (Attributes, Attributes) {
-        (Attribute::Bold.into(), Attribute::Reset.into())
-    }
-
-    fn draw_point(&self, point: Point) -> Option<char> {
-        if let Some(cell) = self.get((point.y, point.x)) {
+    fn draw_point(&self, point: Point, offset: Point) -> Result<()> {
+        let mut style = ContentStyle {
+            foreground_color: None,
+            background_color: Some(Black),
+            underline_color: None,
+            attributes: Reset.into(),
+        };
+        let char = if let Some(cell) = self.get::<(usize, usize)>(point.into()) {
             if cell.get() == State::Alive {
-                return Some('●');
+                style.foreground_color = Some(Green);
+                style.attributes = Bold.into();
+                '●'
             } else {
-                return Some('◌');
+                style.background_color = Some(Grey);
+                '◌'
             }
         } else {
-            return None;
-        }
+            ' '
+        };
+
+        queue!(
+            stdout(),
+            MoveTo(offset.x, offset.y),
+            SetStyle(style),
+            Print(char)
+        )?;
+        Ok(())
     }
 }
 
