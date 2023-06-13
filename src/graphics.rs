@@ -1,6 +1,18 @@
 use super::*;
 
-use std::ops::{Add, Sub};
+use crossterm::{
+    cursor::MoveTo,
+    queue,
+    style::{
+        Attribute::Bold,
+        Color::{Black, White},
+        ContentStyle, Print, SetStyle,
+    },
+};
+use std::{
+    io::{stdout, Write},
+    ops::{Add, Sub},
+};
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
 pub struct Point {
@@ -70,12 +82,64 @@ impl Area {
             && point.y <= self.max.y
     }
 
-    pub fn height(&self) -> usize {
-        (self.max.y - self.origin.y).try_into().unwrap_or(0)
+    pub fn height(&self) -> u16 {
+        self.max.y - self.origin.y
     }
 
-    pub fn width(&self) -> usize {
-        (self.max.x - self.origin.x).try_into().unwrap_or(0)
+    pub fn width(&self) -> u16 {
+        self.max.x - self.origin.x
+    }
+
+    pub fn draw_outline(&self) -> Result<()> {
+        let style = ContentStyle {
+            foreground_color: Some(White),
+            background_color: Some(Black),
+            underline_color: None,
+            attributes: Bold.into(),
+        };
+
+        for x in 0..self.width() {
+            queue!(
+                stdout(),
+                MoveTo(x + self.origin.x, self.origin.y),
+                SetStyle(style),
+                Print('━'),
+                MoveTo(x + self.origin.x, self.max.y),
+                SetStyle(style),
+                Print('━')
+            )?;
+        }
+
+        for y in 0..self.height() {
+            queue!(
+                stdout(),
+                MoveTo(self.origin.x, y + self.origin.y),
+                SetStyle(style),
+                Print('┃'),
+                MoveTo(self.max.x, y + self.origin.y),
+                SetStyle(style),
+                Print('┃')
+            )?;
+        }
+
+        queue!(
+            stdout(),
+            MoveTo(self.origin.x, self.origin.y),
+            SetStyle(style),
+            Print('┏'),
+            MoveTo(self.origin.x, self.max.y),
+            SetStyle(style),
+            Print('┗'),
+            MoveTo(self.max.x, self.origin.y),
+            SetStyle(style),
+            Print('┓'),
+            MoveTo(self.max.x, self.max.y),
+            SetStyle(style),
+            Print('┛'),
+        )?;
+
+        stdout().flush()?;
+        Ok(())
     }
 }
 

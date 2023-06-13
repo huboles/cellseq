@@ -9,7 +9,12 @@ use crossterm::{
 };
 use ndarray::Array2;
 use rand::{thread_rng, Rng};
-use std::{cell::Cell, io::stdout, ops::Deref};
+use std::{
+    cell::Cell,
+    io::{stdout, Write},
+    ops::Deref,
+};
+use tokio::sync::watch::Receiver;
 
 use super::*;
 
@@ -27,7 +32,10 @@ pub struct World {
 
 impl World {
     pub fn new(area: Area) -> Self {
-        let map = Array2::from_elem((area.width(), area.height()), Cell::new(State::Dead));
+        let width = area.width().try_into().unwrap_or(0);
+        let height = area.height().try_into().unwrap_or(0);
+
+        let map = Array2::from_elem((height + 1, width + 1), Cell::new(State::Dead));
         Self { map, area }
     }
 
@@ -43,18 +51,37 @@ impl World {
     }
 
     fn wrap_walls(&mut self) {
-        macro_rules! wrap {
-            ($portal:expr,$wall:expr) => {
-                for (portal, wall) in $portal.iter().zip($wall) {
-                    portal.set(wall.get());
-                }
-            };
+        for (hidden, shown) in self
+            .column(0)
+            .iter()
+            .zip(self.column((self.area.width() - 2).try_into().unwrap_or(0)))
+        {
+            hidden.set(shown.get());
         }
 
-        wrap!(self.column(0), self.column(self.area.width() - 2));
-        wrap!(self.column(self.area.width() - 1), self.column(1));
-        wrap!(self.row(0), self.row(self.area.height() - 2));
-        wrap!(self.row(self.area.height() - 1), self.row(1));
+        for (hidden, shown) in self
+            .column((self.area.width() - 1).try_into().unwrap_or(0))
+            .iter()
+            .zip(self.column(1))
+        {
+            hidden.set(shown.get());
+        }
+
+        for (hidden, shown) in self
+            .row(0)
+            .iter()
+            .zip(self.row((self.area.height() - 2).try_into().unwrap_or(0)))
+        {
+            hidden.set(shown.get());
+        }
+
+        for (hidden, shown) in self
+            .row((self.area.height() - 1).try_into().unwrap_or(0))
+            .iter()
+            .zip(self.row(1))
+        {
+            hidden.set(shown.get());
+        }
     }
 
     pub fn update(&mut self) {
@@ -84,14 +111,15 @@ impl World {
         }
     }
 
-    fn draw_point(&self, point: Point, offset: Point) -> Result<()> {
+    pub fn draw_point(&self, cell: Point) -> Result<()> {
         let mut style = ContentStyle {
             foreground_color: None,
             background_color: Some(Black),
             underline_color: None,
             attributes: Reset.into(),
         };
-        let char = if let Some(cell) = self.get::<(usize, usize)>(point.into()) {
+        let (col, row) = cell.into();
+        let char = if let Some(cell) = self.get((row, col)) {
             if cell.get() == State::Alive {
                 style.foreground_color = Some(Green);
                 style.attributes = Bold.into();
@@ -106,7 +134,7 @@ impl World {
 
         queue!(
             stdout(),
-            MoveTo(offset.x, offset.y),
+            MoveTo(cell.x + self.area.origin.x, cell.y + self.area.origin.y),
             SetStyle(style),
             Print(char)
         )?;
@@ -118,5 +146,21 @@ impl Deref for World {
     type Target = Array2<Cell<State>>;
     fn deref(&self) -> &Self::Target {
         &self.map
+    }
+}
+
+pub async fn run_world(clock: &mut Receiver<usize>, world: &mut World) -> Result<()> {
+    loop {
+        world.update();
+
+        for x in 1..(world.area.width() - 1).try_into()? {
+            for y in 1..(world.area.height()).try_into()? {
+                world.draw_point(Point::new(x, y))?;
+            }
+        }
+
+        clock.changed().await?;
+
+        stdout().flush()?;
     }
 }
