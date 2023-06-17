@@ -2,12 +2,49 @@ use iced::executor;
 use iced::theme::{self, Theme};
 use iced::time;
 use iced::widget::{button, column, container, row, slider, text};
-use iced::{Alignment, Application, Command, Element, Length, Subscription};
+use iced::{Alignment, Application, Command, Element, Length, Point, Subscription};
 use std::time::{Duration, Instant};
 
+mod life;
 mod map;
+mod mask;
+mod state;
 
+use life::*;
 use map::*;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Cell {
+    i: isize,
+    j: isize,
+}
+
+impl Cell {
+    const SIZE: usize = 16;
+
+    fn at(position: Point) -> Cell {
+        let i = (position.y / Cell::SIZE as f32).ceil() as isize;
+        let j = (position.x / Cell::SIZE as f32).ceil() as isize;
+
+        Cell {
+            i: i.saturating_sub(1),
+            j: j.saturating_sub(1),
+        }
+    }
+
+    fn cluster(cell: Cell) -> impl Iterator<Item = Cell> {
+        use itertools::Itertools;
+
+        let rows = cell.i.saturating_sub(1)..=cell.i.saturating_add(1);
+        let columns = cell.j.saturating_sub(1)..=cell.j.saturating_add(1);
+
+        rows.cartesian_product(columns).map(|(i, j)| Cell { i, j })
+    }
+
+    fn neighbors(cell: Cell) -> impl Iterator<Item = Cell> {
+        Cell::cluster(cell).filter(move |candidate| *candidate != cell)
+    }
+}
 
 #[derive(Default)]
 pub struct CellSeq {

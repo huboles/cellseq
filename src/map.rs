@@ -1,20 +1,20 @@
 use iced::alignment;
 use iced::mouse;
-use iced::touch;
 use iced::widget::canvas;
 use iced::widget::canvas::event::{self, Event};
 use iced::widget::canvas::{Cache, Canvas, Cursor, Frame, Geometry, Path, Text};
 use iced::{Color, Element, Length, Point, Rectangle, Size, Theme, Vector};
-use rustc_hash::{FxHashMap, FxHashSet};
 use std::future::Future;
 use std::ops::RangeInclusive;
 use std::time::{Duration, Instant};
 
+use crate::{mask::Note, state::State, Cell, Life};
+
 pub struct Map {
     state: State,
     life_cache: Cache,
+    mask_cache: Cache,
     translation: Vector,
-    show_lines: bool,
     last_tick_duration: Duration,
     last_queued_ticks: usize,
 }
@@ -23,6 +23,8 @@ pub struct Map {
 pub enum Message {
     Populate(Cell),
     Unpopulate(Cell),
+    Check(Cell),
+    Uncheck(Cell),
     Ticked {
         result: Result<Life, TickError>,
         tick_duration: Duration,
@@ -39,8 +41,8 @@ impl Default for Map {
         Self {
             state: State::with_life(Life::default()),
             life_cache: Cache::default(),
+            mask_cache: Cache::default(),
             translation: Vector::default(),
-            show_lines: true,
             last_tick_duration: Duration::default(),
             last_queued_ticks: 0,
         }
@@ -67,6 +69,14 @@ impl Map {
 
     pub fn update(&mut self, message: Message) {
         match message {
+            Message::Check(cell) => {
+                self.state.check(cell);
+                self.mask_cache.clear();
+            }
+            Message::Uncheck(cell) => {
+                self.state.uncheck(cell);
+                self.mask_cache.clear();
+            }
             Message::Populate(cell) => {
                 self.state.populate(cell);
                 self.life_cache.clear();
@@ -104,14 +114,6 @@ impl Map {
         self.life_cache.clear();
     }
 
-    pub fn toggle_lines(&mut self, enabled: bool) {
-        self.show_lines = enabled;
-    }
-
-    pub fn are_lines_visible(&self) -> bool {
-        self.show_lines
-    }
-
     fn visible_region(&self, size: Size) -> Region {
         let width = size.width;
         let height = size.height;
@@ -124,10 +126,24 @@ impl Map {
         }
     }
 
-    fn project(&self, position: Point, size: Size) -> Point {
+    fn project(&self, position: Point, size: Size, in_life: bool) -> Point {
         let region = self.visible_region(size);
 
-        Point::new(position.x / 1.0 + region.x, position.y / 1.0 + region.y)
+        let center = Point {
+            x: size.width / 2.0,
+            y: size.height / 2.0,
+        };
+
+        let translation = Vector {
+            x: 0.0,
+            y: if in_life {
+                center.y - center.y / 2.0
+            } else {
+                center.y + center.y / 2.0
+            },
+        };
+
+        Point::new(position.x + region.x, position.y + region.y) + translation
     }
 }
 
@@ -141,6 +157,8 @@ impl canvas::Program<Message> for Map {
         bounds: Rectangle,
         cursor: Cursor,
     ) -> (event::Status, Option<Message>) {
+        let center = bounds.center();
+
         if let Event::Mouse(mouse::Event::ButtonReleased(_)) = event {
             *interaction = Interaction::None;
         }
@@ -151,82 +169,68 @@ impl canvas::Program<Message> for Map {
             return (event::Status::Ignored, None);
         };
 
-        let cell = Cell::at(self.project(cursor_position, bounds.size()));
-        let is_populated = self.state.contains(&cell);
+        let cell: Cell;
+        let action: Option<Message>;
+        let is_populated: bool;
 
-        let (populate, unpopulate) = if is_populated {
-            (None, Some(Message::Unpopulate(cell)))
+        if cursor_position.y < center.y {
+            cell = Cell::at(self.project(cursor_position, bounds.size(), true));
+            is_populated = self.state.contains(&cell);
+
+            action = if is_populated {
+                Some(Message::Unpopulate(cell))
+            } else {
+                Some(Message::Populate(cell))
+            };
         } else {
-            (Some(Message::Populate(cell)), None)
-        };
+            cell = Cell::at(self.project(cursor_position, bounds.size(), false));
+            is_populated = self.state.mask_contains(&cell);
+
+            action = if is_populated {
+                Some(Message::Uncheck(cell))
+            } else {
+                Some(Message::Check(cell))
+            };
+        }
 
         match event {
-            Event::Touch(touch::Event::FingerMoved { .. }) => {
-                let message = {
-                    *interaction = if is_populated {
-                        Interaction::Erasing
-                    } else {
-                        Interaction::Drawing
-                    };
-
-                    populate.or(unpopulate)
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+                *interaction = if is_populated {
+                    Interaction::Erasing
+                } else {
+                    Interaction::Drawing
                 };
-
-                (event::Status::Captured, message)
+                (event::Status::Captured, action)
             }
-            Event::Mouse(mouse_event) => match mouse_event {
-                mouse::Event::ButtonPressed(button) => {
-                    let message = match button {
-                        mouse::Button::Left => {
-                            *interaction = if is_populated {
-                                Interaction::Erasing
-                            } else {
-                                Interaction::Drawing
-                            };
-
-                            populate.or(unpopulate)
-                        }
-                        _ => None,
-                    };
-
-                    (event::Status::Captured, message)
-                }
-                mouse::Event::CursorMoved { .. } => {
-                    let message = match *interaction {
-                        Interaction::Drawing => populate,
-                        Interaction::Erasing => unpopulate,
-                        _ => None,
-                    };
-
-                    let event_status = match interaction {
-                        Interaction::None => event::Status::Ignored,
-                        _ => event::Status::Captured,
-                    };
-
-                    (event_status, message)
-                }
-                _ => (event::Status::Ignored, None),
-            },
             _ => (event::Status::Ignored, None),
         }
     }
+
     fn draw(
         &self,
         _interaction: &Interaction,
         _theme: &Theme,
         bounds: Rectangle,
-        cursor: Cursor,
+        _cursor: Cursor,
     ) -> Vec<Geometry> {
         let center = Vector::new(bounds.width / 2.0, bounds.height / 2.0);
 
-        let life = self.life_cache.draw(bounds.size(), |frame| {
+        let split_half = Size::new(bounds.width, bounds.height / 2.0);
+
+        let life_canvas = Rectangle::new(bounds.position(), split_half);
+        let mask_canvas =
+            Rectangle::new(bounds.position() + Vector::new(0.0, center.y), split_half);
+
+        let life = self.life_cache.draw(life_canvas.size(), |frame| {
+            let life_center = Vector {
+                x: bounds.x + life_canvas.center().x,
+                y: bounds.y + life_canvas.center().y,
+            };
             let background = Path::rectangle(Point::ORIGIN, frame.size());
-            frame.fill(&background, Color::from_rgb8(0x40, 0x44, 0x4B));
+            frame.fill(&background, Color::from_rgb8(0xA0, 0x44, 0x4B));
 
             frame.with_save(|frame| {
-                frame.translate(center);
-                frame.scale(1.0);
-                frame.translate(self.translation);
+                frame.translate(life_center);
                 frame.scale(Cell::SIZE as f32);
 
                 let region = self.visible_region(frame.size());
@@ -241,30 +245,32 @@ impl canvas::Program<Message> for Map {
             });
         });
 
-        let overlay = {
-            let mut frame = Frame::new(bounds.size());
+        let mask = self.mask_cache.draw(mask_canvas.size(), |frame| {
+            let mask_center = Vector {
+                x: bounds.x + life_canvas.center().x,
+                y: bounds.y + life_canvas.center().y,
+            };
+            let background = Path::rectangle(Point::ORIGIN, frame.size());
+            frame.fill(&background, Color::from_rgb8(0x40, 0x44, 0xA0));
 
-            let hovered_cell = cursor
-                .position_in(&bounds)
-                .map(|position| Cell::at(self.project(position, frame.size())));
+            frame.with_save(|frame| {
+                frame.translate(mask_center);
+                frame.scale(Cell::SIZE as f32);
 
-            if let Some(cell) = hovered_cell {
-                frame.with_save(|frame| {
-                    frame.translate(center);
-                    frame.scale(1.0);
-                    frame.translate(self.translation);
-                    frame.scale(Cell::SIZE as f32);
+                let region = self.visible_region(frame.size());
 
+                for (cell, _) in region.cull_mask(self.state.mask()) {
                     frame.fill_rectangle(
                         Point::new(cell.j as f32, cell.i as f32),
                         Size::UNIT,
-                        Color {
-                            a: 0.5,
-                            ..Color::BLACK
-                        },
+                        Color::WHITE,
                     );
-                });
-            }
+                }
+            });
+        });
+
+        let overlay = {
+            let mut frame = Frame::new(bounds.size());
 
             let text = Text {
                 color: Color::WHITE,
@@ -274,14 +280,6 @@ impl canvas::Program<Message> for Map {
                 vertical_alignment: alignment::Vertical::Bottom,
                 ..Text::default()
             };
-
-            if let Some(cell) = hovered_cell {
-                frame.fill_text(Text {
-                    content: format!("({}, {})", cell.j, cell.i),
-                    position: text.position - Vector::new(0.0, 16.0),
-                    ..text
-                });
-            }
 
             let cell_count = self.state.cell_count();
 
@@ -299,7 +297,7 @@ impl canvas::Program<Message> for Map {
             frame.into_geometry()
         };
 
-        vec![life, overlay]
+        vec![overlay, mask, life]
     }
 
     fn mouse_interaction(
@@ -316,182 +314,6 @@ impl canvas::Program<Message> for Map {
         }
     }
 }
-
-#[derive(Default)]
-struct State {
-    life: Life,
-    births: FxHashSet<Cell>,
-    is_ticking: bool,
-}
-
-impl State {
-    pub fn with_life(life: Life) -> Self {
-        Self {
-            life,
-            ..Self::default()
-        }
-    }
-
-    fn cell_count(&self) -> usize {
-        self.life.len() + self.births.len()
-    }
-
-    fn contains(&self, cell: &Cell) -> bool {
-        self.life.contains(cell) || self.births.contains(cell)
-    }
-
-    fn cells(&self) -> impl Iterator<Item = &Cell> {
-        self.life.iter().chain(self.births.iter())
-    }
-
-    fn populate(&mut self, cell: Cell) {
-        if self.is_ticking {
-            self.births.insert(cell);
-        } else {
-            self.life.populate(cell);
-        }
-    }
-
-    fn unpopulate(&mut self, cell: &Cell) {
-        if self.is_ticking {
-            let _ = self.births.remove(cell);
-        } else {
-            self.life.unpopulate(cell);
-        }
-    }
-
-    fn update(&mut self, mut life: Life) {
-        self.births.drain().for_each(|cell| life.populate(cell));
-
-        self.life = life;
-        self.is_ticking = false;
-    }
-
-    fn tick(&mut self, amount: usize) -> Option<impl Future<Output = Result<Life, TickError>>> {
-        if self.is_ticking {
-            return None;
-        }
-
-        self.is_ticking = true;
-
-        let mut life = self.life.clone();
-
-        Some(async move {
-            tokio::task::spawn_blocking(move || {
-                for _ in 0..amount {
-                    life.tick();
-                }
-
-                life
-            })
-            .await
-            .map_err(|_| TickError::JoinFailed)
-        })
-    }
-}
-
-#[derive(Clone, Default)]
-pub struct Life {
-    cells: FxHashSet<Cell>,
-}
-
-impl Life {
-    fn len(&self) -> usize {
-        self.cells.len()
-    }
-
-    fn contains(&self, cell: &Cell) -> bool {
-        self.cells.contains(cell)
-    }
-
-    fn populate(&mut self, cell: Cell) {
-        self.cells.insert(cell);
-    }
-
-    fn unpopulate(&mut self, cell: &Cell) {
-        let _ = self.cells.remove(cell);
-    }
-
-    fn tick(&mut self) {
-        let mut adjacent_life = FxHashMap::default();
-
-        for cell in &self.cells {
-            let _ = adjacent_life.entry(*cell).or_insert(0);
-
-            for neighbor in Cell::neighbors(*cell) {
-                let amount = adjacent_life.entry(neighbor).or_insert(0);
-
-                *amount += 1;
-            }
-        }
-
-        for (cell, amount) in adjacent_life.iter() {
-            match amount {
-                2 => {}
-                3 => {
-                    let _ = self.cells.insert(*cell);
-                }
-                _ => {
-                    let _ = self.cells.remove(cell);
-                }
-            }
-        }
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = &Cell> {
-        self.cells.iter()
-    }
-}
-
-impl std::iter::FromIterator<Cell> for Life {
-    fn from_iter<I: IntoIterator<Item = Cell>>(iter: I) -> Self {
-        Life {
-            cells: iter.into_iter().collect(),
-        }
-    }
-}
-
-impl std::fmt::Debug for Life {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Life")
-            .field("cells", &self.cells.len())
-            .finish()
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Cell {
-    i: isize,
-    j: isize,
-}
-
-impl Cell {
-    const SIZE: usize = 16;
-
-    fn at(position: Point) -> Cell {
-        let i = (position.y / Cell::SIZE as f32).ceil() as isize;
-        let j = (position.x / Cell::SIZE as f32).ceil() as isize;
-
-        Cell {
-            i: i.saturating_sub(1),
-            j: j.saturating_sub(1),
-        }
-    }
-
-    fn cluster(cell: Cell) -> impl Iterator<Item = Cell> {
-        use itertools::Itertools;
-
-        let rows = cell.i.saturating_sub(1)..=cell.i.saturating_add(1);
-        let columns = cell.j.saturating_sub(1)..=cell.j.saturating_add(1);
-
-        rows.cartesian_product(columns).map(|(i, j)| Cell { i, j })
-    }
-
-    fn neighbors(cell: Cell) -> impl Iterator<Item = Cell> {
-        Cell::cluster(cell).filter(move |candidate| *candidate != cell)
-    }
-}
-
 pub struct Region {
     x: f32,
     y: f32,
@@ -521,6 +343,16 @@ impl Region {
         let columns = self.columns();
 
         cells.filter(move |cell| rows.contains(&cell.i) && columns.contains(&cell.j))
+    }
+
+    fn cull_mask<'a>(
+        &self,
+        cells: impl Iterator<Item = (&'a Cell, &'a Note)>,
+    ) -> impl Iterator<Item = (&'a Cell, &'a Note)> {
+        let rows = self.rows();
+        let columns = self.columns();
+
+        cells.filter(move |(cell, _)| rows.contains(&cell.i) && columns.contains(&cell.j))
     }
 }
 
