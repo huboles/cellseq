@@ -1,8 +1,4 @@
-use crate::{
-    life::Life,
-    mask::{Mask, Note},
-    Cell, TickError,
-};
+use crate::{life::Life, Cell};
 
 use rustc_hash::FxHashSet;
 use std::future::Future;
@@ -10,7 +6,6 @@ use std::future::Future;
 #[derive(Default)]
 pub struct State {
     life: Life,
-    mask: Mask,
     births: FxHashSet<Cell>,
     is_ticking: bool,
 }
@@ -23,32 +18,25 @@ impl State {
         }
     }
 
-    pub fn cell_count(&self) -> usize {
-        self.life.len() + self.births.len()
-    }
-
     pub fn contains(&self, cell: &Cell) -> bool {
         self.life.contains(cell) || self.births.contains(cell)
     }
 
-    pub fn mask_contains(&self, cell: &Cell) -> bool {
-        self.mask.contains(cell)
+    pub fn randomize(&mut self) {
+        self.life.randomize()
     }
 
-    pub fn cells(&self) -> impl Iterator<Item = &Cell> {
-        self.life.iter().chain(self.births.iter())
+    pub fn clear(&mut self) {
+        self.life.clear();
     }
 
-    pub fn mask(&self) -> impl Iterator<Item = (&Cell, &Note)> {
-        self.mask.iter()
+    pub fn save(&mut self) {
+        self.life.save_state();
     }
 
-    pub fn check(&mut self, cell: Cell) {
-        self.mask.check(cell);
-    }
-
-    pub fn uncheck(&mut self, cell: Cell) {
-        self.mask.uncheck(cell);
+    pub fn reset(&mut self) {
+        self.life.clear();
+        self.life.reset();
     }
 
     pub fn populate(&mut self, cell: Cell) {
@@ -68,13 +56,13 @@ impl State {
     }
 
     pub fn update(&mut self, mut life: Life) {
-        self.births.drain().for_each(|cell| life.populate(cell));
+        // self.births.drain().for_each(|cell| life.populate(cell));
 
         self.life = life;
         self.is_ticking = false;
     }
 
-    pub fn tick(&mut self, amount: usize) -> Option<impl Future<Output = Result<Life, TickError>>> {
+    pub fn tick(&mut self, amount: usize) -> Option<impl Future<Output = Life>> {
         if self.is_ticking {
             return None;
         }
@@ -88,11 +76,10 @@ impl State {
                 for _ in 0..amount {
                     life.tick();
                 }
-
                 life
             })
             .await
-            .map_err(|_| TickError::JoinFailed)
+            .unwrap()
         })
     }
 }

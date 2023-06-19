@@ -13,7 +13,7 @@ mod state;
 use life::*;
 use map::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct Cell {
     i: isize,
     j: isize,
@@ -48,10 +48,10 @@ impl Cell {
 
 #[derive(Default)]
 pub struct CellSeq {
-    grid: Map,
+    map: Map,
     is_playing: bool,
     queued_ticks: usize,
-    speed: usize,
+    bpm: usize,
     next_speed: Option<usize>,
     version: usize,
 }
@@ -61,9 +61,11 @@ pub enum Message {
     Grid(map::Message, usize),
     Tick(Instant),
     TogglePlayback,
-    Next,
+    Randomize,
+    Reset,
     Clear,
-    SpeedChanged(f32),
+    Save,
+    SpeedChanged(usize),
 }
 
 impl Application for CellSeq {
@@ -75,7 +77,7 @@ impl Application for CellSeq {
     fn new(_flags: ()) -> (Self, Command<Message>) {
         (
             Self {
-                speed: 5,
+                bpm: 120,
                 ..Self::default()
             },
             Command::none(),
@@ -90,15 +92,15 @@ impl Application for CellSeq {
         match message {
             Message::Grid(message, version) => {
                 if version == self.version {
-                    self.grid.update(message);
+                    self.map.update(message);
                 }
             }
-            Message::Tick(_) | Message::Next => {
-                self.queued_ticks = (self.queued_ticks + 1).min(self.speed);
+            Message::Tick(_) => {
+                self.queued_ticks = (self.queued_ticks + 1).min(self.bpm);
 
-                if let Some(task) = self.grid.tick(self.queued_ticks) {
+                if let Some(task) = self.map.tick(self.queued_ticks) {
                     if let Some(speed) = self.next_speed.take() {
-                        self.speed = speed;
+                        self.bpm = speed;
                     }
 
                     self.queued_ticks = 0;
@@ -112,16 +114,15 @@ impl Application for CellSeq {
                 self.is_playing = !self.is_playing;
             }
             Message::Clear => {
-                self.grid.clear();
+                self.map.clear();
                 self.version += 1;
             }
-            Message::SpeedChanged(speed) => {
-                if self.is_playing {
-                    self.next_speed = Some(speed.round() as usize);
-                } else {
-                    self.speed = speed.round() as usize;
-                }
+            Message::SpeedChanged(bpm) => {
+                self.bpm = bpm;
             }
+            Message::Randomize => self.map.randomize(),
+            Message::Reset => self.map.reset(),
+            Message::Save => self.map.save(),
         }
 
         Command::none()
@@ -129,7 +130,7 @@ impl Application for CellSeq {
 
     fn subscription(&self) -> Subscription<Message> {
         if self.is_playing {
-            time::every(Duration::from_millis(1000 / self.speed as u64)).map(Message::Tick)
+            time::every(Duration::from_millis(60000 / self.bpm as u64)).map(Message::Tick)
         } else {
             Subscription::none()
         }
@@ -137,15 +138,11 @@ impl Application for CellSeq {
 
     fn view(&self) -> Element<Message> {
         let version = self.version;
-        let selected_speed = self.next_speed.unwrap_or(self.speed);
+        let selected_speed = self.next_speed.unwrap_or(self.bpm);
         let controls = view_controls(self.is_playing, selected_speed);
+        let map = self.map.view().map(move |m| Message::Grid(m, version));
 
-        let content = column![
-            self.grid
-                .view()
-                .map(move |message| Message::Grid(message, version)),
-            controls,
-        ];
+        let content = column![controls, map,];
 
         container(content)
             .width(Length::Fill)
@@ -158,18 +155,16 @@ impl Application for CellSeq {
     }
 }
 
-fn view_controls<'a>(is_playing: bool, speed: usize) -> Element<'a, Message> {
-    let playback_controls = row![
-        button(if is_playing { "Pause" } else { "Play" }).on_press(Message::TogglePlayback),
-        button("Next")
-            .on_press(Message::Next)
-            .style(theme::Button::Secondary),
-    ]
-    .spacing(10);
+fn view_controls<'a>(is_playing: bool, bpm: usize) -> Element<'a, Message> {
+    let playback_controls =
+        row![button(if is_playing { "pause" } else { "play" }).on_press(Message::TogglePlayback),]
+            .spacing(10);
 
     let speed_controls = row![
-        slider(1.0..=1000.0, speed as f32, Message::SpeedChanged),
-        text(format!("x{speed}")).size(16),
+        slider(1.0..=1000.0, bpm as f32, |m| Message::SpeedChanged(
+            m.round() as usize
+        )),
+        text(format!("{bpm}")).size(16),
     ]
     .width(Length::Fill)
     .align_items(Alignment::Center)
@@ -178,7 +173,14 @@ fn view_controls<'a>(is_playing: bool, speed: usize) -> Element<'a, Message> {
     row![
         playback_controls,
         speed_controls,
-        button("Clear")
+        button("save").on_press(Message::Save),
+        button("reset")
+            .on_press(Message::Reset)
+            .style(theme::Button::Secondary),
+        button("random")
+            .on_press(Message::Randomize)
+            .style(theme::Button::Positive),
+        button("clear")
             .on_press(Message::Clear)
             .style(theme::Button::Destructive),
     ]
