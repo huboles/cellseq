@@ -1,15 +1,20 @@
-use iced::mouse;
+use iced::mouse::{self, Button::Left, Event::ButtonPressed};
 use iced::widget::canvas;
 use iced::widget::canvas::event::{self, Event};
 use iced::widget::canvas::{Cache, Canvas, Cursor, Geometry, Path};
 use iced::{Color, Element, Length, Point, Rectangle, Size, Theme};
+
+use super::*;
+
 use itertools::Itertools;
-use std::future::Future;
+use rand::random;
+use rustc_hash::FxHashMap;
+use std::{fmt::Debug, future::Future};
 
-use crate::{state::State, Cell, Life};
-
+#[derive(Default, Debug)]
 pub struct Map {
-    state: State,
+    seed: CellMap,
+    cells: CellMap,
     life_cache: Cache,
 }
 
@@ -17,37 +22,55 @@ pub struct Map {
 pub enum Message {
     Populate(Cell),
     Unpopulate(Cell),
-    Ticked(Life),
-}
-
-impl Default for Map {
-    fn default() -> Self {
-        Self {
-            state: State::with_life(Life::default()),
-            life_cache: Cache::default(),
-        }
-    }
+    Ticked(CellMap),
 }
 
 impl Map {
-    pub fn tick(&mut self, amount: usize) -> Option<impl Future<Output = Message>> {
-        let tick = self.state.tick(amount)?;
+    pub fn tick(&self) -> impl Future<Output = Message> {
+        let mut life = self.cells.clone();
+        let mut counts = FxHashMap::default();
 
-        Some(async move { Message::Ticked(tick.await) })
+        let tick = tokio::task::spawn_blocking(move || {
+            for cell in &life {
+                counts.entry(*cell).or_insert(0);
+
+                for neighbor in Cell::neighbors(*cell) {
+                    let amount = counts.entry(neighbor).or_insert(0);
+
+                    *amount += 1;
+                }
+            }
+
+            for (cell, amount) in counts.iter() {
+                match amount {
+                    2 => {}
+                    3 => {
+                        life.insert(*cell);
+                    }
+                    _ => {
+                        life.remove(cell);
+                    }
+                }
+            }
+
+            life
+        });
+
+        async move { Message::Ticked(tick.await.unwrap()) }
     }
 
     pub fn update(&mut self, message: Message) {
         match message {
             Message::Populate(cell) => {
-                self.state.populate(cell);
+                self.cells.insert(cell);
                 self.life_cache.clear();
             }
             Message::Unpopulate(cell) => {
-                self.state.unpopulate(&cell);
+                self.cells.remove(&cell);
                 self.life_cache.clear();
             }
             Message::Ticked(life) => {
-                self.state.update(life);
+                self.cells = life;
                 self.life_cache.clear();
             }
         }
@@ -61,21 +84,32 @@ impl Map {
     }
 
     pub fn clear(&mut self) {
-        self.state.clear();
+        self.cells.clear();
         self.life_cache.clear();
     }
 
     pub fn reset(&mut self) {
-        self.state.reset();
+        self.cells = self.seed.clone();
+        self.life_cache.clear();
     }
 
     pub fn save(&mut self) {
-        self.state.save();
+        self.seed = self.cells.clone();
     }
 
     pub fn randomize(&mut self) {
+        self.cells.clear();
+        for (i, j) in (-32..=32).cartesian_product(-32..=32) {
+            if random::<f32>() > 0.5 {
+                self.cells.insert(Cell { i, j });
+            }
+        }
+        self.seed = self.cells.clone();
         self.life_cache.clear();
-        self.state.randomize();
+    }
+
+    pub fn contains(&self, cell: &Cell) -> bool {
+        self.cells.contains(cell)
     }
 }
 
@@ -89,14 +123,12 @@ impl canvas::Program<Message> for Map {
         bounds: Rectangle,
         cursor: Cursor,
     ) -> (event::Status, Option<Message>) {
-        if let Some(pos) = cursor.position_in(&bounds) {
-            if let Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) = event {
-                let location = Point { x: pos.x, y: pos.y };
-
-                let cell = Cell::at(location);
+        if let Some(position) = cursor.position_in(&bounds) {
+            if let Event::Mouse(ButtonPressed(Left)) = event {
+                let cell = Cell::at(position);
                 return (
                     event::Status::Captured,
-                    if self.state.contains(&cell) {
+                    if self.contains(&cell) {
                         Some(Message::Unpopulate(cell))
                     } else {
                         Some(Message::Populate(cell))
@@ -124,10 +156,10 @@ impl canvas::Program<Message> for Map {
 
                 (0..24)
                     .cartesian_product(0..24)
-                    .filter(|(i, j)| self.state.contains(&Cell { i: *i, j: *j }))
-                    .for_each(|(i, j)| {
+                    .filter(|x| self.contains(&Cell { i: x.1, j: x.0 }))
+                    .for_each(|x| {
                         frame.fill_rectangle(
-                            Point::new(j as f32, i as f32),
+                            Point::new(x.0 as f32, x.1 as f32),
                             Size::UNIT,
                             Color::WHITE,
                         );

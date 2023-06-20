@@ -3,15 +3,17 @@ use iced::theme::{self, Theme};
 use iced::time;
 use iced::widget::{button, column, container, row, slider, text};
 use iced::{Alignment, Application, Command, Element, Length, Point, Subscription};
+
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::time::{Duration, Instant};
 
-mod life;
 mod map;
 mod mask;
-mod state;
 
-use life::*;
 use map::*;
+use mask::*;
+
+pub type CellMap = FxHashSet<Cell>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct Cell {
@@ -49,16 +51,15 @@ impl Cell {
 #[derive(Default)]
 pub struct CellSeq {
     map: Map,
+    mask: Mask,
     is_playing: bool,
-    queued_ticks: usize,
     bpm: usize,
-    next_speed: Option<usize>,
-    version: usize,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    Grid(map::Message, usize),
+    Map(map::Message),
+    Mask(mask::Message),
     Tick(Instant),
     TogglePlayback,
     Randomize,
@@ -85,41 +86,23 @@ impl Application for CellSeq {
     }
 
     fn title(&self) -> String {
-        String::from("Game of Life - Iced")
+        String::from("cellseq")
     }
 
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
-            Message::Grid(message, version) => {
-                if version == self.version {
-                    self.map.update(message);
-                }
-            }
+            Message::Map(message) => self.map.update(message),
+            Message::Mask(message) => self.mask.update(message),
             Message::Tick(_) => {
-                self.queued_ticks = (self.queued_ticks + 1).min(self.bpm);
-
-                if let Some(task) = self.map.tick(self.queued_ticks) {
-                    if let Some(speed) = self.next_speed.take() {
-                        self.bpm = speed;
-                    }
-
-                    self.queued_ticks = 0;
-
-                    let version = self.version;
-
-                    return Command::perform(task, move |message| Message::Grid(message, version));
-                }
+                return Command::perform(self.map.tick(), Message::Map);
             }
             Message::TogglePlayback => {
                 self.is_playing = !self.is_playing;
             }
-            Message::Clear => {
-                self.map.clear();
-                self.version += 1;
-            }
             Message::SpeedChanged(bpm) => {
                 self.bpm = bpm;
             }
+            Message::Clear => self.map.clear(),
             Message::Randomize => self.map.randomize(),
             Message::Reset => self.map.reset(),
             Message::Save => self.map.save(),
@@ -137,10 +120,9 @@ impl Application for CellSeq {
     }
 
     fn view(&self) -> Element<Message> {
-        let version = self.version;
-        let selected_speed = self.next_speed.unwrap_or(self.bpm);
-        let controls = view_controls(self.is_playing, selected_speed);
-        let map = self.map.view().map(move |m| Message::Grid(m, version));
+        let bpm = self.bpm;
+        let controls = view_controls(self.is_playing, bpm);
+        let map = self.map.view().map(Message::Map);
 
         let content = column![controls, map,];
 
