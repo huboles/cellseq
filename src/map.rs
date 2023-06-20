@@ -1,7 +1,9 @@
-use iced::mouse::{self, Button::Left, Event::ButtonPressed};
-use iced::widget::canvas;
 use iced::widget::canvas::event::{self, Event};
 use iced::widget::canvas::{Cache, Canvas, Cursor, Geometry, Path};
+use iced::{
+    mouse::{self, Button::Left, Event::ButtonPressed},
+    widget::canvas::Program,
+};
 use iced::{Color, Element, Length, Point, Rectangle, Size, Theme};
 
 use super::*;
@@ -113,7 +115,7 @@ impl Map {
     }
 }
 
-impl canvas::Program<Message> for Map {
+impl Program<Message> for Map {
     type State = bool;
 
     fn update(

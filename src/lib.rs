@@ -4,7 +4,7 @@ use iced::time;
 use iced::widget::{button, column, container, row, slider, text};
 use iced::{Alignment, Application, Command, Element, Length, Point, Subscription};
 
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashSet;
 use std::time::{Duration, Instant};
 
 mod map;
@@ -122,7 +122,12 @@ impl Application for CellSeq {
     fn view(&self) -> Element<Message> {
         let bpm = self.bpm;
         let controls = view_controls(self.is_playing, bpm);
-        let map = self.map.view().map(Message::Map);
+        let map = row![
+            self.map.view().map(Message::Map),
+            self.mask.view().map(Message::Mask)
+        ]
+        .width(Length::Fill)
+        .spacing(40);
 
         let content = column![controls, map,];
 
