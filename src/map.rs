@@ -11,7 +11,7 @@ use super::*;
 use itertools::Itertools;
 use rand::random;
 use rustc_hash::FxHashMap;
-use std::{fmt::Debug, future::Future};
+use std::fmt::Debug;
 
 #[derive(Default, Debug)]
 pub struct Map {
@@ -28,37 +28,37 @@ pub enum Message {
 }
 
 impl Map {
-    pub fn tick(&self) -> impl Future<Output = Message> {
+    pub fn reset_loop(&mut self) -> CellMap {
+        self.seed.clone()
+    }
+
+    pub fn tick(&self) -> CellMap {
         let mut life = self.cells.clone();
         let mut counts = FxHashMap::default();
 
-        let tick = tokio::task::spawn_blocking(move || {
-            for cell in &life {
-                counts.entry(*cell).or_insert(0);
+        for cell in &life {
+            counts.entry(*cell).or_insert(0);
 
-                for neighbor in Cell::neighbors(*cell) {
-                    let amount = counts.entry(neighbor).or_insert(0);
+            for neighbor in Cell::neighbors(*cell) {
+                let amount = counts.entry(neighbor).or_insert(0);
 
-                    *amount += 1;
+                *amount += 1;
+            }
+        }
+
+        for (cell, amount) in counts.iter() {
+            match amount {
+                2 => {}
+                3 => {
+                    life.insert(*cell);
+                }
+                _ => {
+                    life.remove(cell);
                 }
             }
+        }
 
-            for (cell, amount) in counts.iter() {
-                match amount {
-                    2 => {}
-                    3 => {
-                        life.insert(*cell);
-                    }
-                    _ => {
-                        life.remove(cell);
-                    }
-                }
-            }
-
-            life
-        });
-
-        async move { Message::Ticked(tick.await.unwrap()) }
+        life
     }
 
     pub fn update(&mut self, message: Message) {
@@ -109,10 +109,6 @@ impl Map {
         self.seed = self.cells.clone();
         self.life_cache.clear();
     }
-
-    pub fn contains(&self, cell: &Cell) -> bool {
-        self.cells.contains(cell)
-    }
 }
 
 impl Program<Message> for Map {
@@ -130,7 +126,7 @@ impl Program<Message> for Map {
                 let cell = Cell::at(position);
                 return (
                     event::Status::Captured,
-                    if self.contains(&cell) {
+                    if self.cells.contains(&cell) {
                         Some(Message::Unpopulate(cell))
                     } else {
                         Some(Message::Populate(cell))
@@ -158,7 +154,7 @@ impl Program<Message> for Map {
 
                 (0..24)
                     .cartesian_product(0..24)
-                    .filter(|x| self.contains(&Cell { i: x.1, j: x.0 }))
+                    .filter(|x| self.cells.contains(&Cell { i: x.1, j: x.0 }))
                     .for_each(|x| {
                         frame.fill_rectangle(
                             Point::new(x.0 as f32, x.1 as f32),

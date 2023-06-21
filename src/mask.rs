@@ -28,7 +28,23 @@ pub enum State {
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Note {
     value: usize,
-    action: State,
+    state: State,
+}
+
+impl Note {
+    pub fn is_on(&self) -> bool {
+        match self.state {
+            State::On => true,
+            State::Off => false,
+        }
+    }
+
+    pub fn switch(&mut self) {
+        self.state = match self.state {
+            State::On => State::Off,
+            State::Off => State::On,
+        }
+    }
 }
 
 #[derive(Default, Debug)]
@@ -38,31 +54,34 @@ pub struct Mask {
 }
 
 impl Mask {
-    pub fn contains(&self, cell: &Cell) -> bool {
-        self.cells.contains_key(cell)
-    }
-
-    pub fn check(&mut self, cell: Cell) {
-        self.cells.insert(cell, Note::default());
-    }
-
-    pub fn uncheck(&mut self, cell: Cell) {
-        let _ = self.cells.remove(&cell);
-    }
-
-    pub fn get_note(&self, cell: &Cell) -> Option<&Note> {
-        self.cells.get(cell)
-    }
-
-    pub fn cells(&self) -> impl Iterator<Item = &Cell> {
-        self.cells.keys()
-    }
-
     pub fn update(&mut self, message: Message) {
         match message {
-            Message::Check(cell) => self.check(cell),
-            Message::Uncheck(cell) => self.uncheck(cell),
-            Message::Tick(life) => {}
+            Message::Check(cell) => {
+                self.cells.insert(cell, Note::default());
+                self.mask_cache.clear()
+            }
+            Message::Uncheck(cell) => {
+                self.cells.remove(&cell);
+                self.mask_cache.clear();
+            }
+            Message::Tick(life) => {
+                for cell in life.iter() {
+                    if self.cells.contains_key(cell) {
+                        let note = self.cells.entry(*cell).or_default();
+                        note.switch()
+                    }
+                }
+
+                self.mask_cache.clear();
+            }
+        }
+    }
+
+    pub fn is_on(&self, cell: &Cell) -> bool {
+        if let Some(note) = self.cells.get(cell) {
+            note.is_on()
+        } else {
+            false
         }
     }
 
@@ -92,13 +111,15 @@ impl Program<Message> for Mask {
 
                 (0..24)
                     .cartesian_product(0..24)
-                    .filter(|x| self.contains(&Cell { i: x.1, j: x.0 }))
+                    .filter(|x| self.cells.contains_key(&Cell { i: x.1, j: x.0 }))
                     .for_each(|x| {
-                        frame.fill_rectangle(
-                            Point::new(x.0 as f32, x.1 as f32),
-                            Size::UNIT,
-                            Color::WHITE,
-                        );
+                        let color = if self.is_on(&Cell { i: x.0, j: x.1 }) {
+                            Color::from_rgb8(0xF0, 0xC0, 0xC0)
+                        } else {
+                            Color::WHITE
+                        };
+
+                        frame.fill_rectangle(Point::new(x.0 as f32, x.1 as f32), Size::UNIT, color);
                     })
             });
         })]
@@ -116,7 +137,7 @@ impl Program<Message> for Mask {
                 let cell = Cell::at(position);
                 return (
                     event::Status::Captured,
-                    if self.contains(&cell) {
+                    if self.cells.contains_key(&cell) {
                         Some(Message::Uncheck(cell))
                     } else {
                         Some(Message::Check(cell))

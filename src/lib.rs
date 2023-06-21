@@ -1,7 +1,7 @@
 use iced::executor;
 use iced::theme::{self, Theme};
 use iced::time;
-use iced::widget::{button, column, container, row, slider, text};
+use iced::widget::{button, column, container, row, text};
 use iced::{Alignment, Application, Command, Element, Length, Point, Subscription};
 
 use rustc_hash::FxHashSet;
@@ -54,6 +54,9 @@ pub struct CellSeq {
     mask: Mask,
     is_playing: bool,
     bpm: usize,
+    is_looping: bool,
+    loop_len: usize,
+    step_num: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -61,12 +64,14 @@ pub enum Message {
     Map(map::Message),
     Mask(mask::Message),
     Tick(Instant),
-    TogglePlayback,
     Randomize,
     Reset,
     Clear,
     Save,
+    TogglePlayback,
     SpeedChanged(usize),
+    ToggleLoop,
+    LoopLength(usize),
 }
 
 impl Application for CellSeq {
@@ -79,6 +84,7 @@ impl Application for CellSeq {
         (
             Self {
                 bpm: 120,
+                loop_len: 16,
                 ..Self::default()
             },
             Command::none(),
@@ -94,18 +100,35 @@ impl Application for CellSeq {
             Message::Map(message) => self.map.update(message),
             Message::Mask(message) => self.mask.update(message),
             Message::Tick(_) => {
-                return Command::perform(self.map.tick(), Message::Map);
+                let life = if self.step_num == self.loop_len && self.is_looping {
+                    self.step_num = 0;
+                    self.map.reset_loop()
+                } else {
+                    self.step_num += 1;
+                    self.map.tick()
+                };
+
+                self.map.update(map::Message::Ticked(life.clone()));
+                self.mask.update(mask::Message::Tick(life));
             }
             Message::TogglePlayback => {
                 self.is_playing = !self.is_playing;
+                if self.is_playing {
+                    self.map.save()
+                }
             }
-            Message::SpeedChanged(bpm) => {
-                self.bpm = bpm;
-            }
+            Message::SpeedChanged(bpm) => self.bpm = bpm,
             Message::Clear => self.map.clear(),
             Message::Randomize => self.map.randomize(),
             Message::Reset => self.map.reset(),
             Message::Save => self.map.save(),
+            Message::ToggleLoop => {
+                self.is_looping = !self.is_looping;
+                if self.is_looping {
+                    self.step_num = 0;
+                }
+            }
+            Message::LoopLength(len) => self.loop_len = len,
         }
 
         Command::none()
@@ -120,14 +143,21 @@ impl Application for CellSeq {
     }
 
     fn view(&self) -> Element<Message> {
-        let bpm = self.bpm;
-        let controls = view_controls(self.is_playing, bpm);
+        let controls = view_controls(
+            self.is_playing,
+            self.bpm,
+            self.is_looping,
+            self.loop_len,
+            self.step_num,
+        );
         let map = row![
             self.map.view().map(Message::Map),
             self.mask.view().map(Message::Mask)
         ]
+        .align_items(Alignment::Center)
         .width(Length::Fill)
-        .spacing(40);
+        .spacing(40)
+        .padding(20);
 
         let content = column![controls, map,];
 
@@ -142,24 +172,38 @@ impl Application for CellSeq {
     }
 }
 
-fn view_controls<'a>(is_playing: bool, bpm: usize) -> Element<'a, Message> {
-    let playback_controls =
-        row![button(if is_playing { "pause" } else { "play" }).on_press(Message::TogglePlayback),]
-            .spacing(10);
+fn view_controls<'a>(
+    is_playing: bool,
+    bpm: usize,
+    is_looping: bool,
+    loop_len: usize,
+    step_num: usize,
+) -> Element<'a, Message> {
+    let playback_controls = row![
+        button(if is_playing { "pause" } else { "play" }).on_press(Message::TogglePlayback),
+        button(if is_looping { "free" } else { "loop" }).on_press(Message::ToggleLoop),
+        button("-").on_press(Message::LoopLength(loop_len.saturating_sub(1))),
+        text(if is_looping {
+            format!("{step_num}/{loop_len}")
+        } else {
+            format!("{loop_len}")
+        }),
+        button("+").on_press(Message::LoopLength(loop_len.saturating_add(1)))
+    ]
+    .spacing(10);
 
     let speed_controls = row![
-        slider(1.0..=1000.0, bpm as f32, |m| Message::SpeedChanged(
-            m.round() as usize
-        )),
+        button("<<").on_press(Message::SpeedChanged(bpm.saturating_sub(5))),
+        button("<").on_press(Message::SpeedChanged(bpm.saturating_sub(1))),
         text(format!("{bpm}")).size(16),
+        button(">").on_press(Message::SpeedChanged(bpm.saturating_add(1))),
+        button(">>").on_press(Message::SpeedChanged(bpm.saturating_add(1))),
     ]
     .width(Length::Fill)
     .align_items(Alignment::Center)
     .spacing(10);
 
-    row![
-        playback_controls,
-        speed_controls,
+    let other_controls = row![
         button("save").on_press(Message::Save),
         button("reset")
             .on_press(Message::Reset)
@@ -171,8 +215,13 @@ fn view_controls<'a>(is_playing: bool, bpm: usize) -> Element<'a, Message> {
             .on_press(Message::Clear)
             .style(theme::Button::Destructive),
     ]
-    .padding(10)
-    .spacing(20)
+    .width(Length::Fill)
     .align_items(Alignment::Center)
-    .into()
+    .spacing(10);
+
+    row![playback_controls, speed_controls, other_controls]
+        .padding(10)
+        .spacing(40)
+        .align_items(Alignment::Center)
+        .into()
 }
