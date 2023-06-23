@@ -1,17 +1,22 @@
-use iced::executor;
-use iced::theme::{self, Theme};
-use iced::time;
-use iced::widget::{button, column, container, row, text};
-use iced::{Alignment, Application, Command, Element, Length, Point, Subscription};
+use iced::{
+    executor,
+    theme::{self, Theme},
+    time,
+    widget::{button, column, container, row, text},
+    {Alignment, Application, Command, Element, Length, Point, Subscription},
+};
 
+use itertools::Itertools;
 use rustc_hash::FxHashSet;
 use std::time::{Duration, Instant};
 
 mod map;
 mod mask;
+mod midi;
 
 use map::*;
 use mask::*;
+use midi::*;
 
 pub type CellMap = FxHashSet<Cell>;
 
@@ -35,8 +40,6 @@ impl Cell {
     }
 
     fn cluster(cell: Cell) -> impl Iterator<Item = Cell> {
-        use itertools::Itertools;
-
         let rows = cell.i.saturating_sub(1)..=cell.i.saturating_add(1);
         let columns = cell.j.saturating_sub(1)..=cell.j.saturating_add(1);
 
@@ -52,6 +55,7 @@ impl Cell {
 pub struct CellSeq {
     map: Map,
     mask: Mask,
+    midi: MidiLink,
     is_playing: bool,
     bpm: usize,
     is_looping: bool,
@@ -61,6 +65,7 @@ pub struct CellSeq {
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    MidiMessage(MidiMessage),
     Map(map::Message),
     Mask(mask::Message),
     Tick(Instant),
@@ -99,6 +104,7 @@ impl Application for CellSeq {
         match message {
             Message::Map(message) => self.map.update(message),
             Message::Mask(message) => self.mask.update(message),
+            Message::MidiMessage(message) => {}
             Message::Tick(_) => {
                 let life = if self.step_num == self.loop_len && self.is_looping {
                     self.step_num = 0;

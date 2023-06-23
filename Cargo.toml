@@ -7,8 +7,10 @@ authors = ["Huck Boles <huck@huck.website>"]
 [dependencies]
 rand = "0.8"
 eyre = "0.6"
+thiserror = "1.0"
 tokio = { version = "1", features = ["full"] }
 array2d = "0.3.0"
 iced = { version = "0.9", features = ["canvas", "tokio", "debug"] }
 itertools = "0.10"
 rustc-hash = "1.1"
+jack = "0.11"

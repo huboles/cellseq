@@ -1,10 +1,11 @@
-use iced::widget::canvas::event::{self, Event};
-use iced::widget::canvas::{Cache, Canvas, Cursor, Geometry, Path};
 use iced::{
     mouse::{self, Button::Left, Event::ButtonPressed},
-    widget::canvas::Program,
+    widget::canvas::{
+        event::{self, Event},
+        Cache, Canvas, Cursor, Geometry, Path, Program,
+    },
+    {Color, Element, Length, Point, Rectangle, Size, Theme},
 };
-use iced::{Color, Element, Length, Point, Rectangle, Size, Theme};
 
 use super::*;
 
