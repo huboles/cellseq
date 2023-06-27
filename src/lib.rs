@@ -16,7 +16,7 @@ mod midi;
 
 use map::*;
 use mask::*;
-use midi::*;
+pub use midi::*;
 
 pub type CellMap = FxHashSet<Cell>;
 
@@ -65,7 +65,7 @@ pub struct CellSeq {
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    MidiMessage(MidiMessage),
+    Midi(MidiMessage),
     Map(map::Message),
     Mask(mask::Message),
     Tick(Instant),
@@ -77,19 +77,21 @@ pub enum Message {
     SpeedChanged(usize),
     ToggleLoop,
     LoopLength(usize),
+    Quit,
 }
 
 impl Application for CellSeq {
     type Message = Message;
     type Theme = Theme;
     type Executor = executor::Default;
-    type Flags = ();
+    type Flags = MidiLink;
 
-    fn new(_flags: ()) -> (Self, Command<Message>) {
+    fn new(flags: Self::Flags) -> (Self, Command<Message>) {
         (
             Self {
                 bpm: 120,
                 loop_len: 16,
+                midi: flags,
                 ..Self::default()
             },
             Command::none(),
@@ -104,9 +106,9 @@ impl Application for CellSeq {
         match message {
             Message::Map(message) => self.map.update(message),
             Message::Mask(message) => self.mask.update(message),
-            Message::MidiMessage(message) => {}
+            Message::Midi(message) => self.midi.update(message),
             Message::Tick(_) => {
-                let life = if self.step_num == self.loop_len && self.is_looping {
+                let map = if self.is_looping && self.step_num > self.loop_len {
                     self.step_num = 0;
                     self.map.reset_loop()
                 } else {
@@ -114,8 +116,15 @@ impl Application for CellSeq {
                     self.map.tick()
                 };
 
-                self.map.update(map::Message::Ticked(life.clone()));
-                self.mask.update(mask::Message::Tick(life));
+                let midi = self.mask.tick(map);
+                let mut commands = Vec::new();
+                for message in midi {
+                    commands.push(Command::perform(async move { message }, |m| {
+                        Message::Midi(m)
+                    }));
+                }
+
+                return Command::batch(commands);
             }
             Message::TogglePlayback => {
                 self.is_playing = !self.is_playing;
@@ -135,6 +144,7 @@ impl Application for CellSeq {
                 }
             }
             Message::LoopLength(len) => self.loop_len = len,
+            Message::Quit => todo!(),
         }
 
         Command::none()
@@ -219,6 +229,9 @@ fn view_controls<'a>(
             .style(theme::Button::Positive),
         button("clear")
             .on_press(Message::Clear)
+            .style(theme::Button::Destructive),
+        button("quit")
+            .on_press(Message::Quit)
             .style(theme::Button::Destructive),
     ]
     .width(Length::Fill)

@@ -6,11 +6,21 @@ use tokio::sync::mpsc::Sender;
 #[derive(Clone, Debug)]
 pub struct MidiLink {
     buffer: VecDeque<u8>,
-    channel: Sender<u8>,
+    channel: Sender<Option<u8>>,
 }
 
-impl MidiLink {
-    pub fn new(channel: Sender<u8>) -> Self {
+impl Default for MidiLink {
+    fn default() -> Self {
+        let (send, _) = tokio::sync::mpsc::channel(128);
+        Self {
+            buffer: VecDeque::default(),
+            channel: send,
+        }
+    }
+}
+
+impl<'a> MidiLink {
+    pub fn new(channel: Sender<Option<u8>>) -> Self {
         Self {
             buffer: VecDeque::default(),
             channel,
@@ -27,9 +37,10 @@ impl MidiLink {
 
     pub async fn tick(&mut self) {
         for byte in self.buffer.iter() {
-            self.channel.send(*byte).await.unwrap();
+            self.channel.send(Some(*byte)).await.unwrap();
         }
 
+        self.channel.send(None).await.unwrap();
         self.buffer.clear();
     }
 }

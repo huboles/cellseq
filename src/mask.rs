@@ -16,11 +16,12 @@ use rustc_hash::FxHashMap;
 pub enum Message {
     Check(Cell),
     Uncheck(Cell),
+    SetNote((Cell, Note)),
     Tick(CellMap),
 }
 
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash)]
-pub enum State {
+enum OnOff {
     #[default]
     Off,
     On,
@@ -28,22 +29,23 @@ pub enum State {
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Note {
-    value: usize,
-    state: State,
+    value: u8,
+    velocity: u8,
+    state: OnOff,
 }
 
 impl Note {
     pub fn is_on(&self) -> bool {
         match self.state {
-            State::On => true,
-            State::Off => false,
+            OnOff::On => true,
+            OnOff::Off => false,
         }
     }
 
     pub fn switch(&mut self) {
         self.state = match self.state {
-            State::On => State::Off,
-            State::Off => State::On,
+            OnOff::On => OnOff::Off,
+            OnOff::Off => OnOff::On,
         }
     }
 }
@@ -75,6 +77,9 @@ impl Mask {
 
                 self.mask_cache.clear();
             }
+            Message::SetNote((cell, note)) => {
+                self.cells.insert(cell, note);
+            }
         }
     }
 
@@ -91,6 +96,27 @@ impl Mask {
             .width(Length::Fixed(Cell::SIZE as f32 * 24.0))
             .height(Length::Fixed(Cell::SIZE as f32 * 24.0))
             .into()
+    }
+
+    pub fn tick(&mut self, life: CellMap) -> Vec<MidiMessage> {
+        let mut note_map: FxHashMap<u8, u8> = FxHashMap::default();
+        let mut messages = Vec::new();
+
+        for cell in life.iter() {
+            if let Some(note) = self.cells.get(cell) {
+                note_map.insert(note.value, note.velocity);
+            }
+        }
+
+        for (note, vel) in note_map {
+            messages.push(MidiMessage::On {
+                note,
+                velocity: vel,
+                channel: 0,
+            })
+        }
+
+        messages
     }
 }
 
