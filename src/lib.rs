@@ -1,8 +1,8 @@
 use iced::{
     executor,
-    theme::{self, Theme},
+    theme::Theme,
     time,
-    widget::{button, column, container, row, text},
+    widget::{column, container, row},
     {Alignment, Application, Command, Element, Length, Point, Subscription},
 };
 
@@ -10,10 +10,12 @@ use itertools::Itertools;
 use rustc_hash::FxHashSet;
 use std::time::{Duration, Instant};
 
+mod display;
 mod map;
 mod mask;
 mod midi;
 
+use display::*;
 use map::*;
 use mask::*;
 pub use midi::*;
@@ -61,6 +63,11 @@ pub struct CellSeq {
     is_looping: bool,
     loop_len: usize,
     step_num: usize,
+    probability: f32,
+    randomness: f32,
+    velocity_min: u8,
+    velocity_max: u8,
+    channel: u8,
 }
 
 #[derive(Debug, Clone)]
@@ -77,6 +84,11 @@ pub enum Message {
     SpeedChanged(usize),
     ToggleLoop,
     LoopLength(usize),
+    ProbChanged(f32),
+    RandChanged(f32),
+    NewVMin(u8),
+    NewVMax(u8),
+    ChannelChange(u8),
     Quit,
 }
 
@@ -116,8 +128,14 @@ impl Application for CellSeq {
                     self.map.tick()
                 };
 
-                let midi = self.mask.tick(map);
+                let midi = self.mask.tick(map.clone());
+
                 let mut commands = Vec::new();
+
+                commands.push(Command::perform(async move { map }, |m| {
+                    Message::Map(map::Message::Ticked(m))
+                }));
+
                 for message in midi {
                     commands.push(Command::perform(async move { message }, |m| {
                         Message::Midi(m)
@@ -134,7 +152,7 @@ impl Application for CellSeq {
             }
             Message::SpeedChanged(bpm) => self.bpm = bpm,
             Message::Clear => self.map.clear(),
-            Message::Randomize => self.map.randomize(),
+            Message::Randomize => self.map.randomize(self.randomness),
             Message::Reset => self.map.reset(),
             Message::Save => self.map.save(),
             Message::ToggleLoop => {
@@ -145,6 +163,11 @@ impl Application for CellSeq {
             }
             Message::LoopLength(len) => self.loop_len = len,
             Message::Quit => todo!(),
+            Message::ProbChanged(prob) => self.probability = prob,
+            Message::RandChanged(rand) => self.randomness = rand,
+            Message::NewVMin(v) => self.velocity_min = v,
+            Message::NewVMax(v) => self.velocity_max = v,
+            Message::ChannelChange(chan) => self.channel = chan,
         }
 
         Command::none()
@@ -159,13 +182,14 @@ impl Application for CellSeq {
     }
 
     fn view(&self) -> Element<Message> {
-        let controls = view_controls(
+        let top = top_controls(
             self.is_playing,
             self.bpm,
             self.is_looping,
             self.loop_len,
             self.step_num,
         );
+
         let map = row![
             self.map.view().map(Message::Map),
             self.mask.view().map(Message::Mask)
@@ -175,7 +199,15 @@ impl Application for CellSeq {
         .spacing(40)
         .padding(20);
 
-        let content = column![controls, map,];
+        let bottom = bottom_controls(
+            self.probability,
+            self.randomness,
+            self.velocity_min,
+            self.velocity_max,
+            self.channel,
+        );
+
+        let content = column![top, map, bottom];
 
         container(content)
             .width(Length::Fill)
@@ -186,61 +218,4 @@ impl Application for CellSeq {
     fn theme(&self) -> Theme {
         Theme::Dark
     }
-}
-
-fn view_controls<'a>(
-    is_playing: bool,
-    bpm: usize,
-    is_looping: bool,
-    loop_len: usize,
-    step_num: usize,
-) -> Element<'a, Message> {
-    let playback_controls = row![
-        button(if is_playing { "pause" } else { "play" }).on_press(Message::TogglePlayback),
-        button(if is_looping { "free" } else { "loop" }).on_press(Message::ToggleLoop),
-        button("-").on_press(Message::LoopLength(loop_len.saturating_sub(1))),
-        text(if is_looping {
-            format!("{step_num}/{loop_len}")
-        } else {
-            format!("{loop_len}")
-        }),
-        button("+").on_press(Message::LoopLength(loop_len.saturating_add(1)))
-    ]
-    .spacing(10);
-
-    let speed_controls = row![
-        button("<<").on_press(Message::SpeedChanged(bpm.saturating_sub(5))),
-        button("<").on_press(Message::SpeedChanged(bpm.saturating_sub(1))),
-        text(format!("{bpm}")).size(16),
-        button(">").on_press(Message::SpeedChanged(bpm.saturating_add(1))),
-        button(">>").on_press(Message::SpeedChanged(bpm.saturating_add(1))),
-    ]
-    .width(Length::Fill)
-    .align_items(Alignment::Center)
-    .spacing(10);
-
-    let other_controls = row![
-        button("save").on_press(Message::Save),
-        button("reset")
-            .on_press(Message::Reset)
-            .style(theme::Button::Secondary),
-        button("random")
-            .on_press(Message::Randomize)
-            .style(theme::Button::Positive),
-        button("clear")
-            .on_press(Message::Clear)
-            .style(theme::Button::Destructive),
-        button("quit")
-            .on_press(Message::Quit)
-            .style(theme::Button::Destructive),
-    ]
-    .width(Length::Fill)
-    .align_items(Alignment::Center)
-    .spacing(10);
-
-    row![playback_controls, speed_controls, other_controls]
-        .padding(10)
-        .spacing(40)
-        .align_items(Alignment::Center)
-        .into()
 }

@@ -100,10 +100,10 @@ impl Map {
         self.seed = self.cells.clone();
     }
 
-    pub fn randomize(&mut self) {
+    pub fn randomize(&mut self, level: f32) {
         self.cells.clear();
         for (i, j) in (-32..=32).cartesian_product(-32..=32) {
-            if random::<f32>() > 0.5 {
+            if random::<f32>() < level {
                 self.cells.insert(Cell { i, j });
             }
         }
