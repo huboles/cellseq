@@ -1,43 +1,29 @@
 use iced::{
     theme,
-    widget::{button, column, row, slider, text},
+    widget::{button, column, pick_list, row, slider, text, Column, Row},
     Alignment, Element, Length,
 };
 
-use crate::Message;
+use crate::{music::Scale, Message};
 
-pub fn top_controls<'a>(
-    is_playing: bool,
+pub struct ControlMessage {
+    probability: f32,
+    randomness: f32,
+    velocity_min: u8,
+    velocity_max: u8,
+    channel: u8,
     bpm: usize,
     is_looping: bool,
     loop_len: usize,
     step_num: usize,
-) -> Element<'a, Message> {
+    octave: u8,
+    range: u8,
+    scale: Scale,
+}
+
+pub fn top_controls<'a>(is_playing: bool) -> Element<'a, Message> {
     let play_button =
         button(if is_playing { "pause" } else { "play" }).on_press(Message::TogglePlayback);
-
-    let loop_controls = row![
-        button(if is_looping { "free" } else { "loop" }).on_press(Message::ToggleLoop),
-        button("-").on_press(Message::LoopLength(loop_len.saturating_sub(1))),
-        text(if is_looping {
-            format!("{step_num}/{loop_len}")
-        } else {
-            format!("{loop_len}")
-        }),
-        button("+").on_press(Message::LoopLength(loop_len.saturating_add(1)))
-    ]
-    .spacing(10);
-
-    let speed_controls = row![
-        button("<<").on_press(Message::SpeedChanged(bpm.saturating_sub(5))),
-        button("<").on_press(Message::SpeedChanged(bpm.saturating_sub(1))),
-        text(format!("{bpm}")).size(16),
-        button(">").on_press(Message::SpeedChanged(bpm.saturating_add(1))),
-        button(">>").on_press(Message::SpeedChanged(bpm.saturating_add(5))),
-    ]
-    .width(Length::Fill)
-    .align_items(Alignment::Center)
-    .spacing(10);
 
     let other_controls = row![button("quit")
         .on_press(Message::Quit)
@@ -46,45 +32,74 @@ pub fn top_controls<'a>(
     .align_items(Alignment::Center)
     .spacing(10);
 
-    row![play_button, loop_controls, speed_controls, other_controls]
+    row![play_button, other_controls]
         .padding(10)
         .spacing(40)
         .align_items(Alignment::Center)
         .into()
 }
 
-pub fn bottom_controls<'a>(
-    prob: f32,
-    rand: f32,
-    vmin: u8,
-    vmax: u8,
-    chan: u8,
-) -> Element<'a, Message> {
-    let probability = row![
-        slider(0.0..=100.0, prob * 100.0, |x| Message::ProbChanged(
-            x / 100.0
-        )),
-        text(format!("{prob}")),
+pub fn bottom_controls<'a>(message: ControlMessage) -> Element<'a, Message> {
+    let song = row![]
+        .padding(10)
+        .spacing(10)
+        .align_items(Alignment::Center);
+
+    column![map_section(&message), midi_section(&message), song]
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .padding(10)
+        .spacing(40)
+        .align_items(Alignment::Center)
+        .into()
+}
+
+fn map_section<'a>(message: &ControlMessage) -> Row<'a, Message> {
+    row![
+        map_buttons(),
+        column![
+            probability_section(message.probability),
+            randomize_section(message.randomness)
+        ]
+        .padding(10)
+        .spacing(10)
+        .align_items(Alignment::Center)
+    ]
+    .padding(10)
+    .spacing(10)
+    .align_items(Alignment::Center)
+}
+
+fn probability_section<'a>(p: f32) -> Row<'a, Message> {
+    row![
+        slider(0.0..=100.0, p * 100.0, |x| {
+            Message::ProbChanged(x / 100.0)
+        }),
+        text(format!("{p}")),
         text("probability a cell gets triggered")
             .style(theme::Text::Color(iced::Color::from_rgb8(0x40, 0x40, 0x40)))
     ]
     .padding(10)
     .spacing(10)
-    .align_items(Alignment::Center);
+    .align_items(Alignment::Center)
+}
 
-    let randomize = row![
-        slider(0.0..=100.0, rand * 100.0, |x| Message::RandChanged(
-            x / 100.0
-        )),
-        text(format!("{rand}")),
+fn randomize_section<'a>(r: f32) -> Row<'a, Message> {
+    row![
+        slider(0.0..=100.0, r * 100.0, |x| {
+            Message::RandChanged(x / 100.0)
+        }),
+        text(format!("{r}")),
         text("percent of board to fill on randomize")
             .style(theme::Text::Color(iced::Color::from_rgb8(0x40, 0x40, 0x40)))
     ]
     .padding(10)
     .spacing(10)
-    .align_items(Alignment::Center);
+    .align_items(Alignment::Center)
+}
 
-    let map_controls = row![
+fn map_buttons<'a>() -> Row<'a, Message> {
+    row![
         button("save")
             .on_press(Message::Save)
             .style(theme::Button::Positive),
@@ -100,14 +115,14 @@ pub fn bottom_controls<'a>(
     ]
     .padding(10)
     .spacing(10)
-    .align_items(Alignment::Center);
+    .align_items(Alignment::Center)
+}
 
-    let map = column![map_controls, randomize];
-
-    let velocity = column![
+fn velocity_sliders<'a>(min: u8, max: u8) -> Column<'a, Message> {
+    column![
         row![
-            slider(0..=127, vmin, Message::NewVMin),
-            text(format!("{vmin}")),
+            slider(0..=127, min, Message::NewVMin),
+            text(format!("{min}")),
             text("minimum velocity")
                 .style(theme::Text::Color(iced::Color::from_rgb8(0x40, 0x40, 0x40)))
         ]
@@ -115,8 +130,8 @@ pub fn bottom_controls<'a>(
         .spacing(10)
         .align_items(Alignment::Center),
         row![
-            slider(0..=127, vmax, Message::NewVMax),
-            text(format!("{vmax}")),
+            slider(0..=127, max, Message::NewVMax),
+            text(format!("{max}")),
             text("maximum velocity")
                 .style(theme::Text::Color(iced::Color::from_rgb8(0x40, 0x40, 0x40)))
         ]
@@ -126,23 +141,86 @@ pub fn bottom_controls<'a>(
     ]
     .padding(10)
     .spacing(10)
-    .align_items(Alignment::Center);
+    .align_items(Alignment::Center)
+}
 
-    let midi = row![
-        button("-").on_press(Message::ChannelChange(chan.saturating_sub(1))),
-        text(format!("{chan}")),
-        button("+").on_press(Message::ChannelChange(chan.saturating_add(1))),
-        velocity
+fn midi_section<'a>(message: &ControlMessage) -> Row<'a, Message> {
+    row![
+        channel_selector(message.channel),
+        velocity_sliders(message.velocity_min, message.velocity_max)
     ]
     .padding(10)
     .spacing(10)
-    .align_items(Alignment::Center);
+    .align_items(Alignment::Center)
+}
 
-    column![probability, map, midi]
+fn channel_selector<'a>(channel: u8) -> Row<'a, Message> {
+    row![
+        button("-").on_press(Message::ChannelChange(channel.saturating_sub(1))),
+        text(format!("channel: {channel}")),
+        button("+").on_press(Message::ChannelChange(channel.saturating_add(1))),
+    ]
+    .padding(10)
+    .spacing(10)
+    .align_items(Alignment::Center)
+}
+
+fn song_section<'a>(message: &ControlMessage) -> Column<'a, Message> {}
+
+fn octave_selector<'a>(oct: u8, range: u8) -> Row<'a, Message> {
+    row![
+        button("-")
+            .on_press(Message::NewOctave(oct.saturating_sub(1)))
+            .style(theme::Button::Destructive),
+        text(format!("octave: {oct}")),
+        button("+")
+            .on_press(Message::NewOctave(oct.saturating_add(1)))
+            .style(theme::Button::Positive),
+        button("-")
+            .on_press(Message::OctaveRange(range.saturating_sub(1)))
+            .style(theme::Button::Destructive),
+        text(format!("range: +/-{range}")),
+        button("+")
+            .on_press(Message::OctaveRange(range.saturating_add(1)))
+            .style(theme::Button::Positive),
+    ]
+    .padding(10)
+    .spacing(10)
+    .align_items(Alignment::Center)
+}
+
+fn loop_controls<'a>(looping: bool, len: usize, step: usize) -> Row<'a, Message> {
+    row![
+        button(if looping { "free" } else { "loop" }).on_press(Message::ToggleLoop),
+        button("-").on_press(Message::LoopLength(len.saturating_sub(1))),
+        text(if looping {
+            format!("{step}/{len}")
+        } else {
+            format!("{len}")
+        }),
+        button("+").on_press(Message::LoopLength(len.saturating_add(1)))
+    ]
+    .padding(10)
+    .spacing(10)
+    .align_items(Alignment::Center)
+}
+
+fn speed_controls<'a>(bpm: usize) -> Row<'a, Message> {
+    row![
+        button("<<").on_press(Message::SpeedChanged(bpm.saturating_sub(5))),
+        button("<").on_press(Message::SpeedChanged(bpm.saturating_sub(1))),
+        text(format!("{bpm}")).size(16),
+        button(">").on_press(Message::SpeedChanged(bpm.saturating_add(1))),
+        button(">>").on_press(Message::SpeedChanged(bpm.saturating_add(5))),
+    ]
+    .width(Length::Fill)
+    .align_items(Alignment::Center)
+    .spacing(10)
+}
+
+fn scale_selector<'a>(scale: Scale) -> Row<'a, Message> {
+    row![pick_list()]
         .width(Length::Fill)
-        .height(Length::Fill)
-        .padding(10)
-        .spacing(40)
         .align_items(Alignment::Center)
-        .into()
+        .spacing(10)
 }

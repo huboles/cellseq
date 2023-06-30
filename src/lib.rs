@@ -7,6 +7,7 @@ use iced::{
 };
 
 use itertools::Itertools;
+use music::Scale;
 use rustc_hash::FxHashSet;
 use std::time::{Duration, Instant};
 
@@ -14,11 +15,13 @@ mod display;
 mod map;
 mod mask;
 mod midi;
+mod music;
 
 use display::*;
 use map::*;
 use mask::*;
 pub use midi::*;
+use music::*;
 
 pub type CellMap = FxHashSet<Cell>;
 
@@ -68,6 +71,9 @@ pub struct CellSeq {
     velocity_min: u8,
     velocity_max: u8,
     channel: u8,
+    octave: u8,
+    oct_range: u8,
+    scale: Scale,
 }
 
 #[derive(Debug, Clone)]
@@ -89,7 +95,16 @@ pub enum Message {
     NewVMin(u8),
     NewVMax(u8),
     ChannelChange(u8),
+    Scale(Scale),
+    NewOctave(u8),
+    OctaveRange(u8),
     Quit,
+}
+
+impl CellSeq {
+    fn control_message(&self) -> ControlMessage {
+        todo!()
+    }
 }
 
 impl Application for CellSeq {
@@ -163,11 +178,14 @@ impl Application for CellSeq {
             }
             Message::LoopLength(len) => self.loop_len = len,
             Message::Quit => todo!(),
-            Message::ProbChanged(prob) => self.probability = prob,
-            Message::RandChanged(rand) => self.randomness = rand,
+            Message::ProbChanged(p) => self.probability = p,
+            Message::RandChanged(r) => self.randomness = r,
             Message::NewVMin(v) => self.velocity_min = v,
             Message::NewVMax(v) => self.velocity_max = v,
-            Message::ChannelChange(chan) => self.channel = chan,
+            Message::ChannelChange(c) => self.channel = c,
+            Message::Scale(s) => self.scale = s,
+            Message::NewOctave(o) => self.octave = o,
+            Message::OctaveRange(r) => self.oct_range = r,
         }
 
         Command::none()
@@ -182,13 +200,7 @@ impl Application for CellSeq {
     }
 
     fn view(&self) -> Element<Message> {
-        let top = top_controls(
-            self.is_playing,
-            self.bpm,
-            self.is_looping,
-            self.loop_len,
-            self.step_num,
-        );
+        let top = top_controls(self.is_playing);
 
         let map = row![
             self.map.view().map(Message::Map),
@@ -199,13 +211,7 @@ impl Application for CellSeq {
         .spacing(40)
         .padding(20);
 
-        let bottom = bottom_controls(
-            self.probability,
-            self.randomness,
-            self.velocity_min,
-            self.velocity_max,
-            self.channel,
-        );
+        let bottom = bottom_controls(self.control_message());
 
         let content = column![top, map, bottom];
 
