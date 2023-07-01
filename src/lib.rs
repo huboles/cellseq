@@ -61,26 +61,22 @@ pub struct CellSeq {
     map: Map,
     mask: Mask,
     midi: MidiLink,
+    info: MidiInfo,
     is_playing: bool,
     bpm: usize,
     is_looping: bool,
     loop_len: usize,
     step_num: usize,
-    probability: f32,
     randomness: f32,
-    velocity_min: u8,
-    velocity_max: u8,
-    channel: u8,
-    octave: u8,
-    oct_range: u8,
-    scale: Scale,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    Midi(MidiMessage),
-    Map(map::Message),
-    Mask(mask::Message),
+    None,
+    MapMessage(map::Message),
+    MaskMessage(mask::Message),
+    NewMap(CellMap),
+    HitCount(u8),
     Tick(Instant),
     Randomize,
     Reset,
@@ -98,6 +94,8 @@ pub enum Message {
     Scale(Scale),
     NewOctave(u8),
     OctaveRange(u8),
+    NewNote(Root),
+    Voices(u8),
     Quit,
 }
 
@@ -131,9 +129,15 @@ impl Application for CellSeq {
 
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
-            Message::Map(message) => self.map.update(message),
-            Message::Mask(message) => self.mask.update(message),
-            Message::Midi(message) => self.midi.update(message),
+            Message::None => {}
+            Message::NewMap(m) => {
+                self.map.update(map::Message::Ticked(m.clone()));
+                let hits = self.mask.tick(m);
+                return Command::perform(async move { hits }, Message::HitCount);
+            }
+            Message::HitCount(x) => self.midi.update(x, &self.info),
+            Message::MapMessage(message) => self.map.update(message),
+            Message::MaskMessage(message) => self.mask.update(message),
             Message::Tick(_) => {
                 let map = if self.is_looping && self.step_num > self.loop_len {
                     self.step_num = 0;
@@ -143,19 +147,18 @@ impl Application for CellSeq {
                     self.map.tick()
                 };
 
-                let midi = self.mask.tick(map.clone());
+                let channel = self.midi.channel_handle();
+                let bytes = self.midi.tick();
+
+                let midi = tokio::spawn(async move {
+                    for byte in bytes {
+                        channel.send(byte).await.unwrap()
+                    }
+                });
 
                 let mut commands = Vec::new();
-
-                commands.push(Command::perform(async move { map }, |m| {
-                    Message::Map(map::Message::Ticked(m))
-                }));
-
-                for message in midi {
-                    commands.push(Command::perform(async move { message }, |m| {
-                        Message::Midi(m)
-                    }));
-                }
+                commands.push(Command::perform(async move { map }, Message::NewMap));
+                commands.push(Command::perform(midi, |_| Message::None));
 
                 return Command::batch(commands);
             }
@@ -178,14 +181,16 @@ impl Application for CellSeq {
             }
             Message::LoopLength(len) => self.loop_len = len,
             Message::Quit => todo!(),
-            Message::ProbChanged(p) => self.probability = p,
+            Message::ProbChanged(p) => self.info.probability = p,
             Message::RandChanged(r) => self.randomness = r,
-            Message::NewVMin(v) => self.velocity_min = v,
-            Message::NewVMax(v) => self.velocity_max = v,
-            Message::ChannelChange(c) => self.channel = c,
-            Message::Scale(s) => self.scale = s,
-            Message::NewOctave(o) => self.octave = o,
-            Message::OctaveRange(r) => self.oct_range = r,
+            Message::NewVMin(v) => self.info.velocity.set_min(v),
+            Message::NewVMax(v) => self.info.velocity.set_max(v),
+            Message::ChannelChange(c) => self.info.channel = c,
+            Message::Scale(s) => self.info.scale = s,
+            Message::NewOctave(o) => self.info.octave.set_center(o),
+            Message::OctaveRange(r) => self.info.octave.set_range(r),
+            Message::NewNote(r) => self.info.root = r,
+            Message::Voices(v) => self.info.voices = v,
         }
 
         Command::none()
@@ -203,8 +208,8 @@ impl Application for CellSeq {
         let top = top_controls(self.is_playing);
 
         let map = row![
-            self.map.view().map(Message::Map),
-            self.mask.view().map(Message::Mask)
+            self.map.view().map(Message::MapMessage),
+            self.mask.view().map(Message::MaskMessage)
         ]
         .align_items(Alignment::Center)
         .width(Length::Fill)

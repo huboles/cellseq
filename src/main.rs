@@ -6,7 +6,7 @@ use eyre::Result;
 use tokio::sync::mpsc::channel;
 
 pub fn main() -> Result<()> {
-    let (midi_snd, _midi_rcv) = channel::<Option<u8>>(256);
+    let (midi_snd, _midi_rcv) = channel::<u8>(256);
 
     let midi = MidiLink::new(midi_snd);
 

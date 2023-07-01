@@ -4,7 +4,10 @@ use iced::{
     Alignment, Element, Length,
 };
 
-use crate::{music::Scale, Message};
+use crate::{
+    music::{Accidental, Root, RootNote, Scale},
+    Message,
+};
 
 pub struct ControlMessage {
     probability: f32,
@@ -19,6 +22,8 @@ pub struct ControlMessage {
     octave: u8,
     range: u8,
     scale: Scale,
+    root: Root,
+    voices: u8,
 }
 
 pub fn top_controls<'a>(is_playing: bool) -> Element<'a, Message> {
@@ -29,29 +34,27 @@ pub fn top_controls<'a>(is_playing: bool) -> Element<'a, Message> {
         .on_press(Message::Quit)
         .style(theme::Button::Destructive),]
     .width(Length::Fill)
-    .align_items(Alignment::Center)
+    .align_items(Alignment::End)
     .spacing(10);
 
     row![play_button, other_controls]
         .padding(10)
         .spacing(40)
-        .align_items(Alignment::Center)
         .into()
 }
 
 pub fn bottom_controls<'a>(message: ControlMessage) -> Element<'a, Message> {
-    let song = row![]
-        .padding(10)
-        .spacing(10)
-        .align_items(Alignment::Center);
-
-    column![map_section(&message), midi_section(&message), song]
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .padding(10)
-        .spacing(40)
-        .align_items(Alignment::Center)
-        .into()
+    column![
+        map_section(&message),
+        midi_section(&message),
+        song_section(&message)
+    ]
+    .width(Length::Fill)
+    .height(Length::Fill)
+    .padding(10)
+    .spacing(40)
+    .align_items(Alignment::Center)
+    .into()
 }
 
 fn map_section<'a>(message: &ControlMessage) -> Row<'a, Message> {
@@ -165,7 +168,32 @@ fn channel_selector<'a>(channel: u8) -> Row<'a, Message> {
     .align_items(Alignment::Center)
 }
 
-fn song_section<'a>(message: &ControlMessage) -> Column<'a, Message> {}
+fn song_section<'a>(message: &ControlMessage) -> Row<'a, Message> {
+    row![
+        column![
+            loop_controls(message.is_looping, message.loop_len, message.step_num),
+            speed_controls(message.bpm)
+        ]
+        .padding(10)
+        .spacing(10)
+        .align_items(Alignment::Center),
+        column![
+            voice_controls(message.voices),
+            octave_selector(message.octave, message.range),
+            scale_selector(
+                message.scale,
+                message.root.get_note(),
+                message.root.get_accidental()
+            )
+        ]
+        .padding(10)
+        .spacing(10)
+        .align_items(Alignment::Center)
+    ]
+    .padding(10)
+    .spacing(10)
+    .align_items(Alignment::Center)
+}
 
 fn octave_selector<'a>(oct: u8, range: u8) -> Row<'a, Message> {
     row![
@@ -218,9 +246,32 @@ fn speed_controls<'a>(bpm: usize) -> Row<'a, Message> {
     .spacing(10)
 }
 
-fn scale_selector<'a>(scale: Scale) -> Row<'a, Message> {
-    row![pick_list()]
-        .width(Length::Fill)
-        .align_items(Alignment::Center)
-        .spacing(10)
+fn voice_controls<'a>(voices: u8) -> Row<'a, Message> {
+    row![
+        button("-")
+            .on_press(Message::Voices(voices.saturating_sub(1)))
+            .style(theme::Button::Destructive),
+        text(format!("voices: {voices}")),
+        button("+")
+            .on_press(Message::Voices(voices.saturating_add(1)))
+            .style(theme::Button::Positive),
+    ]
+    .padding(10)
+    .spacing(10)
+    .align_items(Alignment::Center)
+}
+
+fn scale_selector<'a>(scale: Scale, note: RootNote, acc: Accidental) -> Row<'a, Message> {
+    row![
+        pick_list(&Scale::ALL[..], Some(scale), Message::Scale),
+        pick_list(&RootNote::ALL[..], Some(note), move |note| {
+            Message::NewNote(Root::new(note, acc))
+        }),
+        pick_list(&Accidental::ALL[..], Some(acc), move |acc| {
+            Message::NewNote(Root::new(note, acc))
+        })
+    ]
+    .width(Length::Fill)
+    .align_items(Alignment::Center)
+    .spacing(10)
 }

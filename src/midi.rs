@@ -1,47 +1,80 @@
-use std::{collections::VecDeque, fmt::Display};
+use std::fmt::Display;
 
+use eyre::Result;
+use rand::random;
 use thiserror::Error;
 use tokio::sync::mpsc::Sender;
 
+use crate::music::{generate_note, generate_velocity, Octave, Root, Scale, Velocity};
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct MidiInfo {
+    pub channel: u8,
+    pub velocity: Velocity,
+    pub octave: Octave,
+    pub scale: Scale,
+    pub root: Root,
+    pub voices: u8,
+    pub probability: f32,
+}
+
 #[derive(Clone, Debug)]
 pub struct MidiLink {
-    buffer: VecDeque<u8>,
-    channel: Sender<Option<u8>>,
+    buffer: Vec<MidiMessage>,
+    channel: Sender<u8>,
 }
 
 impl Default for MidiLink {
     fn default() -> Self {
         let (send, _) = tokio::sync::mpsc::channel(128);
         Self {
-            buffer: VecDeque::default(),
             channel: send,
+            buffer: Vec::default(),
         }
     }
 }
 
-impl<'a> MidiLink {
-    pub fn new(channel: Sender<Option<u8>>) -> Self {
+impl MidiLink {
+    pub fn new(channel: Sender<u8>) -> Self {
         Self {
-            buffer: VecDeque::default(),
             channel,
+            ..Self::default()
         }
     }
 
-    pub fn update(&mut self, message: MidiMessage) {
-        let bytes = message.as_bytes().unwrap();
+    pub fn channel_handle(&self) -> Sender<u8> {
+        self.channel.clone()
+    }
 
-        for byte in bytes.iter().filter_map(|x| *x) {
-            self.buffer.push_back(byte);
+    pub fn update(&mut self, hits: u8, info: &MidiInfo) {
+        let mut count = 0;
+
+        for _ in 0..hits {
+            if count > info.voices {
+                break;
+            } else if random::<f32>() < info.probability {
+                continue;
+            } else {
+                count += 1;
+                self.buffer.push(MidiMessage::On {
+                    note: generate_note(info),
+                    velocity: generate_velocity(info.velocity),
+                    channel: info.channel,
+                });
+            }
         }
     }
 
-    pub async fn tick(&mut self) {
-        for byte in self.buffer.iter() {
-            self.channel.send(Some(*byte)).await.unwrap();
-        }
+    pub fn tick(&mut self) -> Vec<u8> {
+        let vec: Vec<u8> = self
+            .buffer
+            .iter()
+            .flat_map(|m| m.as_bytes().unwrap())
+            .flatten()
+            .collect();
 
-        self.channel.send(None).await.unwrap();
         self.buffer.clear();
+        vec
     }
 }
 
@@ -105,8 +138,8 @@ impl Display for MidiMessage {
     }
 }
 
-static DATA_BIT: u8 = 0b0111_1111;
-static STATUS_BIT: u8 = 0b1111_1111;
+static DATA_MASK: u8 = 0b0111_1111;
+static STATUS_MASK: u8 = 0b1111_1111;
 
 impl MidiMessage {
     pub fn as_bytes(&self) -> Result<[Option<u8>; 3], MidiError> {
@@ -122,9 +155,9 @@ impl MidiMessage {
                 } else if *channel > 15 {
                     return Err(MidiError::ChannelOverflow { message: *self });
                 }
-                bytes[0] = Some(STATUS_BIT & (0x90 + channel));
-                bytes[1] = Some(DATA_BIT & note);
-                bytes[2] = Some(DATA_BIT & velocity);
+                bytes[0] = Some(STATUS_MASK & (0x90 + channel));
+                bytes[1] = Some(DATA_MASK & note);
+                bytes[2] = Some(DATA_MASK & velocity);
             }
             MidiMessage::Off {
                 note,
@@ -136,9 +169,9 @@ impl MidiMessage {
                 } else if *channel > 15 {
                     return Err(MidiError::ChannelOverflow { message: *self });
                 }
-                bytes[0] = Some(STATUS_BIT & (0x80 + channel));
-                bytes[1] = Some(DATA_BIT & note);
-                bytes[2] = Some(DATA_BIT & velocity);
+                bytes[0] = Some(STATUS_MASK & (0x80 + channel));
+                bytes[1] = Some(DATA_MASK & note);
+                bytes[2] = Some(DATA_MASK & velocity);
             }
             MidiMessage::Cc {
                 controller,
@@ -150,9 +183,9 @@ impl MidiMessage {
                 } else if *channel > 15 {
                     return Err(MidiError::ChannelOverflow { message: *self });
                 }
-                bytes[0] = Some(STATUS_BIT & (0xD0 + channel));
-                bytes[1] = Some(DATA_BIT & controller);
-                bytes[2] = Some(DATA_BIT & value);
+                bytes[0] = Some(STATUS_MASK & (0xD0 + channel));
+                bytes[1] = Some(DATA_MASK & controller);
+                bytes[2] = Some(DATA_MASK & value);
             }
             MidiMessage::TimingTick => bytes[0] = Some(0xF8),
             MidiMessage::StartSong => bytes[0] = Some(0xFA),
