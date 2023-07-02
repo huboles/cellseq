@@ -5,9 +5,11 @@ use rand::random;
 use thiserror::Error;
 use tokio::sync::mpsc::Sender;
 
-use crate::music::{generate_note, generate_velocity, Octave, Root, Scale, Velocity};
+use crate::music::{
+    generate_note, generate_velocity, Accidental, Octave, Root, RootNote, Scale, Velocity,
+};
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 pub struct MidiInfo {
     pub channel: u8,
     pub velocity: Velocity,
@@ -16,6 +18,20 @@ pub struct MidiInfo {
     pub root: Root,
     pub voices: u8,
     pub probability: f32,
+}
+
+impl Default for MidiInfo {
+    fn default() -> Self {
+        Self {
+            channel: 0,
+            velocity: Velocity::new(64, 127),
+            octave: Octave::new(4, 1),
+            scale: Scale::Chromatic,
+            root: Root::new(RootNote::C, Accidental::Natural),
+            voices: 6,
+            probability: 0.5,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

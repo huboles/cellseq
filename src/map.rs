@@ -19,6 +19,7 @@ pub struct Map {
     seed: CellMap,
     cells: CellMap,
     life_cache: Cache,
+    randomness: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -100,15 +101,23 @@ impl Map {
         self.seed = self.cells.clone();
     }
 
-    pub fn randomize(&mut self, level: f32) {
+    pub fn randomize(&mut self) {
         self.cells.clear();
         for (i, j) in (-32..=32).cartesian_product(-32..=32) {
-            if random::<f32>() < level {
+            if random::<f32>() < self.randomness {
                 self.cells.insert(Cell { i, j });
             }
         }
         self.seed = self.cells.clone();
         self.life_cache.clear();
+    }
+
+    pub fn randomness(&self) -> f32 {
+        self.randomness
+    }
+
+    pub fn set_randomness(&mut self, value: f32) {
+        self.randomness = value;
     }
 }
 

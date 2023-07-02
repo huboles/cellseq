@@ -61,13 +61,31 @@ pub struct CellSeq {
     map: Map,
     mask: Mask,
     midi: MidiLink,
+    song: SongInfo,
     info: MidiInfo,
-    is_playing: bool,
-    bpm: usize,
-    is_looping: bool,
-    loop_len: usize,
-    step_num: usize,
-    randomness: f32,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct SongInfo {
+    pub is_playing: bool,
+    pub bpm: usize,
+    pub divisor: usize,
+    pub is_looping: bool,
+    pub loop_len: usize,
+    pub step_num: usize,
+}
+
+impl Default for SongInfo {
+    fn default() -> Self {
+        Self {
+            is_playing: false,
+            bpm: 120,
+            divisor: 1,
+            is_looping: false,
+            loop_len: 16,
+            step_num: 0,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -84,6 +102,7 @@ pub enum Message {
     Save,
     TogglePlayback,
     SpeedChanged(usize),
+    NewDivision(usize),
     ToggleLoop,
     LoopLength(usize),
     ProbChanged(f32),
@@ -101,7 +120,11 @@ pub enum Message {
 
 impl CellSeq {
     fn control_message(&self) -> ControlMessage {
-        todo!()
+        ControlMessage {
+            randomness: self.map.randomness(),
+            info: self.info.clone(),
+            song: self.song.clone(),
+        }
     }
 }
 
@@ -114,8 +137,6 @@ impl Application for CellSeq {
     fn new(flags: Self::Flags) -> (Self, Command<Message>) {
         (
             Self {
-                bpm: 120,
-                loop_len: 16,
                 midi: flags,
                 ..Self::default()
             },
@@ -129,21 +150,22 @@ impl Application for CellSeq {
 
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
+            Message::Quit => todo!(), // TODO: figure out how to cleanly quit
             Message::None => {}
+            Message::MapMessage(message) => self.map.update(message),
+            Message::MaskMessage(message) => self.mask.update(message),
+            Message::HitCount(x) => self.midi.update(x, &self.info),
             Message::NewMap(m) => {
                 self.map.update(map::Message::Ticked(m.clone()));
                 let hits = self.mask.tick(m);
                 return Command::perform(async move { hits }, Message::HitCount);
             }
-            Message::HitCount(x) => self.midi.update(x, &self.info),
-            Message::MapMessage(message) => self.map.update(message),
-            Message::MaskMessage(message) => self.mask.update(message),
             Message::Tick(_) => {
-                let map = if self.is_looping && self.step_num > self.loop_len {
-                    self.step_num = 0;
+                let map = if self.song.is_looping && self.song.step_num > self.song.loop_len {
+                    self.song.step_num = 0;
                     self.map.reset_loop()
                 } else {
-                    self.step_num += 1;
+                    self.song.step_num += 1;
                     self.map.tick()
                 };
 
@@ -163,26 +185,26 @@ impl Application for CellSeq {
                 return Command::batch(commands);
             }
             Message::TogglePlayback => {
-                self.is_playing = !self.is_playing;
-                if self.is_playing {
+                self.song.is_playing = !self.song.is_playing;
+                if self.song.is_playing {
                     self.map.save()
                 }
             }
-            Message::SpeedChanged(bpm) => self.bpm = bpm,
-            Message::Clear => self.map.clear(),
-            Message::Randomize => self.map.randomize(self.randomness),
-            Message::Reset => self.map.reset(),
-            Message::Save => self.map.save(),
             Message::ToggleLoop => {
-                self.is_looping = !self.is_looping;
-                if self.is_looping {
-                    self.step_num = 0;
+                self.song.is_looping = !self.song.is_looping;
+                if self.song.is_looping {
+                    self.song.step_num = 0;
                 }
             }
-            Message::LoopLength(len) => self.loop_len = len,
-            Message::Quit => todo!(),
+            Message::Clear => self.map.clear(),
+            Message::Randomize => self.map.randomize(),
+            Message::Reset => self.map.reset(),
+            Message::Save => self.map.save(),
+            Message::SpeedChanged(b) => self.song.bpm = b,
+            Message::NewDivision(d) => self.song.divisor = d,
+            Message::LoopLength(l) => self.song.loop_len = l,
             Message::ProbChanged(p) => self.info.probability = p,
-            Message::RandChanged(r) => self.randomness = r,
+            Message::RandChanged(r) => self.map.set_randomness(r),
             Message::NewVMin(v) => self.info.velocity.set_min(v),
             Message::NewVMax(v) => self.info.velocity.set_max(v),
             Message::ChannelChange(c) => self.info.channel = c,
@@ -197,15 +219,18 @@ impl Application for CellSeq {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        if self.is_playing {
-            time::every(Duration::from_millis(60000 / self.bpm as u64)).map(Message::Tick)
+        if self.song.is_playing {
+            time::every(Duration::from_millis(
+                60000 / (self.song.bpm * self.song.divisor) as u64,
+            ))
+            .map(Message::Tick)
         } else {
             Subscription::none()
         }
     }
 
     fn view(&self) -> Element<Message> {
-        let top = top_controls(self.is_playing);
+        let top = top_controls(self.song.is_playing);
 
         let map = row![
             self.map.view().map(Message::MapMessage),

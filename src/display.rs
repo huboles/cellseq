@@ -6,24 +6,14 @@ use iced::{
 
 use crate::{
     music::{Accidental, Root, RootNote, Scale},
-    Message,
+    Message, MidiInfo, SongInfo,
 };
 
+#[derive(Default, Copy, Clone, Debug)]
 pub struct ControlMessage {
-    probability: f32,
-    randomness: f32,
-    velocity_min: u8,
-    velocity_max: u8,
-    channel: u8,
-    bpm: usize,
-    is_looping: bool,
-    loop_len: usize,
-    step_num: usize,
-    octave: u8,
-    range: u8,
-    scale: Scale,
-    root: Root,
-    voices: u8,
+    pub randomness: f32,
+    pub info: MidiInfo,
+    pub song: SongInfo,
 }
 
 pub fn top_controls<'a>(is_playing: bool) -> Element<'a, Message> {
@@ -38,39 +28,34 @@ pub fn top_controls<'a>(is_playing: bool) -> Element<'a, Message> {
     .spacing(10);
 
     row![play_button, other_controls]
+        .width(Length::Fill)
         .padding(10)
         .spacing(40)
         .into()
 }
 
 pub fn bottom_controls<'a>(message: ControlMessage) -> Element<'a, Message> {
-    column![
-        map_section(&message),
-        midi_section(&message),
-        song_section(&message)
-    ]
-    .width(Length::Fill)
-    .height(Length::Fill)
-    .padding(10)
-    .spacing(40)
-    .align_items(Alignment::Center)
-    .into()
+    column![map_section(&message), midi_section(&message),]
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .padding(10)
+        .spacing(20)
+        .align_items(Alignment::Center)
+        .into()
 }
 
 fn map_section<'a>(message: &ControlMessage) -> Row<'a, Message> {
     row![
         map_buttons(),
         column![
-            probability_section(message.probability),
+            probability_section(message.info.probability),
             randomize_section(message.randomness)
         ]
         .padding(10)
         .spacing(10)
         .align_items(Alignment::Center)
     ]
-    .padding(10)
     .spacing(10)
-    .align_items(Alignment::Center)
 }
 
 fn probability_section<'a>(p: f32) -> Row<'a, Message> {
@@ -82,9 +67,7 @@ fn probability_section<'a>(p: f32) -> Row<'a, Message> {
         text("probability a cell gets triggered")
             .style(theme::Text::Color(iced::Color::from_rgb8(0x40, 0x40, 0x40)))
     ]
-    .padding(10)
     .spacing(10)
-    .align_items(Alignment::Center)
 }
 
 fn randomize_section<'a>(r: f32) -> Row<'a, Message> {
@@ -96,125 +79,101 @@ fn randomize_section<'a>(r: f32) -> Row<'a, Message> {
         text("percent of board to fill on randomize")
             .style(theme::Text::Color(iced::Color::from_rgb8(0x40, 0x40, 0x40)))
     ]
-    .padding(10)
     .spacing(10)
-    .align_items(Alignment::Center)
 }
 
-fn map_buttons<'a>() -> Row<'a, Message> {
-    row![
-        button("save")
-            .on_press(Message::Save)
-            .style(theme::Button::Positive),
-        button("clear")
-            .on_press(Message::Clear)
-            .style(theme::Button::Destructive),
-        button("reset")
-            .on_press(Message::Reset)
-            .style(theme::Button::Secondary),
-        button("random")
-            .on_press(Message::Randomize)
-            .style(theme::Button::Primary),
+fn map_buttons<'a>() -> Column<'a, Message> {
+    column![
+        row![
+            button("save")
+                .on_press(Message::Save)
+                .style(theme::Button::Positive),
+            button("clear")
+                .on_press(Message::Clear)
+                .style(theme::Button::Destructive),
+        ]
+        .spacing(10),
+        row![
+            button("reset")
+                .on_press(Message::Reset)
+                .style(theme::Button::Secondary),
+            button("random")
+                .on_press(Message::Randomize)
+                .style(theme::Button::Primary),
+        ]
+        .spacing(10)
     ]
-    .padding(10)
     .spacing(10)
-    .align_items(Alignment::Center)
 }
 
 fn velocity_sliders<'a>(min: u8, max: u8) -> Column<'a, Message> {
     column![
         row![
-            slider(0..=127, min, Message::NewVMin),
-            text(format!("{min}")),
-            text("minimum velocity")
-                .style(theme::Text::Color(iced::Color::from_rgb8(0x40, 0x40, 0x40)))
-        ]
-        .padding(10)
-        .spacing(10)
-        .align_items(Alignment::Center),
-        row![
-            slider(0..=127, max, Message::NewVMax),
             text(format!("{max}")),
+            slider(0..=127, max, Message::NewVMax),
             text("maximum velocity")
                 .style(theme::Text::Color(iced::Color::from_rgb8(0x40, 0x40, 0x40)))
         ]
-        .padding(10)
-        .spacing(10)
-        .align_items(Alignment::Center)
+        .spacing(10),
+        row![
+            text(format!("{min}")),
+            slider(0..=127, min, Message::NewVMin),
+            text("minimum velocity")
+                .style(theme::Text::Color(iced::Color::from_rgb8(0x40, 0x40, 0x40)))
+        ]
+        .spacing(10),
     ]
-    .padding(10)
     .spacing(10)
-    .align_items(Alignment::Center)
 }
 
-fn midi_section<'a>(message: &ControlMessage) -> Row<'a, Message> {
-    row![
-        channel_selector(message.channel),
-        velocity_sliders(message.velocity_min, message.velocity_max)
+fn midi_section<'a>(message: &ControlMessage) -> Column<'a, Message> {
+    column![
+        song_section(message),
+        velocity_sliders(message.info.velocity.min(), message.info.velocity.max())
     ]
-    .padding(10)
     .spacing(10)
-    .align_items(Alignment::Center)
-}
-
-fn channel_selector<'a>(channel: u8) -> Row<'a, Message> {
-    row![
-        button("-").on_press(Message::ChannelChange(channel.saturating_sub(1))),
-        text(format!("channel: {channel}")),
-        button("+").on_press(Message::ChannelChange(channel.saturating_add(1))),
-    ]
-    .padding(10)
-    .spacing(10)
-    .align_items(Alignment::Center)
 }
 
 fn song_section<'a>(message: &ControlMessage) -> Row<'a, Message> {
     row![
         column![
-            loop_controls(message.is_looping, message.loop_len, message.step_num),
-            speed_controls(message.bpm)
+            loop_controls(
+                message.song.is_looping,
+                message.song.loop_len,
+                message.song.step_num
+            ),
+            speed_controls(message.song.bpm),
+            division_controls(message.song.divisor),
         ]
         .padding(10)
         .spacing(10)
         .align_items(Alignment::Center),
         column![
-            voice_controls(message.voices),
-            octave_selector(message.octave, message.range),
+            voice_controls(message.info.voices, message.info.channel),
+            octave_selector(message.info.octave.center(), message.info.octave.range()),
             scale_selector(
-                message.scale,
-                message.root.get_note(),
-                message.root.get_accidental()
+                message.info.scale,
+                message.info.root.get_note(),
+                message.info.root.get_accidental()
             )
         ]
         .padding(10)
         .spacing(10)
         .align_items(Alignment::Center)
     ]
-    .padding(10)
     .spacing(10)
-    .align_items(Alignment::Center)
 }
 
 fn octave_selector<'a>(oct: u8, range: u8) -> Row<'a, Message> {
     row![
-        button("-")
-            .on_press(Message::NewOctave(oct.saturating_sub(1)))
-            .style(theme::Button::Destructive),
+        button("-").on_press(Message::NewOctave(oct.saturating_sub(1))),
         text(format!("octave: {oct}")),
-        button("+")
-            .on_press(Message::NewOctave(oct.saturating_add(1)))
-            .style(theme::Button::Positive),
-        button("-")
-            .on_press(Message::OctaveRange(range.saturating_sub(1)))
-            .style(theme::Button::Destructive),
+        button("+").on_press(Message::NewOctave(oct.saturating_add(1))),
+        button("-").on_press(Message::OctaveRange(range.saturating_sub(1))),
         text(format!("range: +/-{range}")),
-        button("+")
-            .on_press(Message::OctaveRange(range.saturating_add(1)))
-            .style(theme::Button::Positive),
+        button("+").on_press(Message::OctaveRange(range.saturating_add(1)))
     ]
-    .padding(10)
     .spacing(10)
-    .align_items(Alignment::Center)
 }
 
 fn loop_controls<'a>(looping: bool, len: usize, step: usize) -> Row<'a, Message> {
@@ -228,9 +187,7 @@ fn loop_controls<'a>(looping: bool, len: usize, step: usize) -> Row<'a, Message>
         }),
         button("+").on_press(Message::LoopLength(len.saturating_add(1)))
     ]
-    .padding(10)
     .spacing(10)
-    .align_items(Alignment::Center)
 }
 
 fn speed_controls<'a>(bpm: usize) -> Row<'a, Message> {
@@ -241,37 +198,43 @@ fn speed_controls<'a>(bpm: usize) -> Row<'a, Message> {
         button(">").on_press(Message::SpeedChanged(bpm.saturating_add(1))),
         button(">>").on_press(Message::SpeedChanged(bpm.saturating_add(5))),
     ]
-    .width(Length::Fill)
-    .align_items(Alignment::Center)
     .spacing(10)
 }
 
-fn voice_controls<'a>(voices: u8) -> Row<'a, Message> {
+fn division_controls<'a>(divisor: usize) -> Row<'a, Message> {
     row![
-        button("-")
-            .on_press(Message::Voices(voices.saturating_sub(1)))
-            .style(theme::Button::Destructive),
-        text(format!("voices: {voices}")),
-        button("+")
-            .on_press(Message::Voices(voices.saturating_add(1)))
-            .style(theme::Button::Positive),
+        button("-").on_press(if divisor > 1 {
+            Message::NewDivision(divisor.saturating_sub(1))
+        } else {
+            Message::None
+        }),
+        text(format!("note division: {divisor}")),
+        button("+").on_press(Message::NewDivision(divisor.saturating_add(1)))
     ]
-    .padding(10)
     .spacing(10)
-    .align_items(Alignment::Center)
+}
+
+fn voice_controls<'a>(voices: u8, channel: u8) -> Row<'a, Message> {
+    row![
+        button("-").on_press(Message::ChannelChange(channel.saturating_sub(1))),
+        text(format!("channel: {channel}")),
+        button("+").on_press(Message::ChannelChange(channel.saturating_add(1))),
+        button("-").on_press(Message::Voices(voices.saturating_sub(1))),
+        text(format!("voices: {voices}")),
+        button("+").on_press(Message::Voices(voices.saturating_add(1))),
+    ]
+    .spacing(10)
 }
 
 fn scale_selector<'a>(scale: Scale, note: RootNote, acc: Accidental) -> Row<'a, Message> {
     row![
-        pick_list(&Scale::ALL[..], Some(scale), Message::Scale),
         pick_list(&RootNote::ALL[..], Some(note), move |note| {
             Message::NewNote(Root::new(note, acc))
         }),
         pick_list(&Accidental::ALL[..], Some(acc), move |acc| {
             Message::NewNote(Root::new(note, acc))
-        })
+        }),
+        pick_list(&Scale::ALL[..], Some(scale), Message::Scale),
     ]
-    .width(Length::Fill)
     .align_items(Alignment::Center)
-    .spacing(10)
 }

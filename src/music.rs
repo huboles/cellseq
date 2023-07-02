@@ -29,12 +29,24 @@ pub struct Octave {
 }
 
 impl Octave {
+    pub fn new(center: u8, range: u8) -> Self {
+        Self { center, range }
+    }
+
     pub fn set_center(&mut self, center: u8) {
         self.center = center;
     }
 
     pub fn set_range(&mut self, range: u8) {
         self.range = range;
+    }
+
+    pub fn center(&self) -> u8 {
+        self.center
+    }
+
+    pub fn range(&self) -> u8 {
+        self.range
     }
 }
 
@@ -54,12 +66,24 @@ pub struct Velocity {
 }
 
 impl Velocity {
+    pub fn new(min: u8, max: u8) -> Self {
+        Self { min, max }
+    }
+
     pub fn set_min(&mut self, min: u8) {
         self.min = min;
     }
 
     pub fn set_max(&mut self, max: u8) {
         self.max = max;
+    }
+
+    pub fn min(&self) -> u8 {
+        self.min
+    }
+
+    pub fn max(&self) -> u8 {
+        self.max
     }
 }
 
