@@ -107,16 +107,22 @@ impl Root {
     }
 }
 
+impl Display for Root {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", self.note, self.accidental)
+    }
+}
+
 impl From<Root> for u8 {
     fn from(val: Root) -> Self {
         let n = match val.note {
             RootNote::A => 21,
-            RootNote::B => 22,
-            RootNote::C => 23,
-            RootNote::D => 24,
-            RootNote::E => 25,
-            RootNote::F => 26,
-            RootNote::G => 27,
+            RootNote::B => 23,
+            RootNote::C => 24,
+            RootNote::D => 26,
+            RootNote::E => 28,
+            RootNote::F => 29,
+            RootNote::G => 31,
         };
 
         match val.accidental {
@@ -178,9 +184,9 @@ pub enum Accidental {
 impl Display for Accidental {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let str = match self {
-            Accidental::Natural => "",
-            Accidental::Sharp => "#",
-            Accidental::Flat => "b",
+            Accidental::Natural => "♮",
+            Accidental::Sharp => "♯",
+            Accidental::Flat => "♭",
         };
         write!(f, "{str}")
     }

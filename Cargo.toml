@@ -13,3 +13,4 @@ array2d = "0.3.0"
 iced = { version = "0.9", features = ["canvas", "tokio", "debug"] }
 itertools = "0.10"
 rustc-hash = "1.1"
+alsa = "0.7"
