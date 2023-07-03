@@ -14,12 +14,23 @@ use rand::random;
 use rustc_hash::FxHashMap;
 use std::fmt::Debug;
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct Map {
     seed: CellMap,
     cells: CellMap,
     life_cache: Cache,
     randomness: f32,
+}
+
+impl Default for Map {
+    fn default() -> Self {
+        Self {
+            seed: CellMap::default(),
+            cells: CellMap::default(),
+            life_cache: Cache::default(),
+            randomness: 0.5,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

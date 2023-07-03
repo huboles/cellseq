@@ -148,13 +148,13 @@ pub enum RootNote {
 impl Display for RootNote {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let str = match self {
-            RootNote::A => "A",
-            RootNote::B => "B",
-            RootNote::C => "C",
-            RootNote::D => "D",
-            RootNote::E => "E",
-            RootNote::F => "F",
-            RootNote::G => "G",
+            RootNote::A => "a",
+            RootNote::B => "b",
+            RootNote::C => "c",
+            RootNote::D => "d",
+            RootNote::E => "e",
+            RootNote::F => "f",
+            RootNote::G => "g",
         };
 
         write!(f, "{str}")
@@ -184,9 +184,9 @@ pub enum Accidental {
 impl Display for Accidental {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let str = match self {
-            Accidental::Natural => "♮",
-            Accidental::Sharp => "♯",
-            Accidental::Flat => "♭",
+            Accidental::Natural => "natural",
+            Accidental::Sharp => "sharp",
+            Accidental::Flat => "flat",
         };
         write!(f, "{str}")
     }

@@ -1,9 +1,6 @@
 use std::{io::Write, thread::JoinHandle};
 
-use alsa::{
-    rawmidi::{Rawmidi, IO},
-    Direction,
-};
+use alsa::{rawmidi::Rawmidi, Direction};
 use cellseq::*;
 
 use iced::{window, Application, Settings};

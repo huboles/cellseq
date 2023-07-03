@@ -3,7 +3,7 @@ use iced::{
     theme::Theme,
     time,
     widget::{column, container, row},
-    {Alignment, Application, Command, Element, Length, Point, Subscription},
+    window, {Alignment, Application, Command, Element, Length, Point, Subscription},
 };
 
 use itertools::Itertools;
@@ -80,7 +80,7 @@ impl Default for SongInfo {
         Self {
             is_playing: false,
             bpm: 120,
-            divisor: 1,
+            divisor: 4,
             is_looping: false,
             loop_len: 16,
             step_num: 0,
@@ -150,7 +150,6 @@ impl Application for CellSeq {
 
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
-            Message::Quit => todo!(), // TODO: figure out how to cleanly quit
             Message::None => {}
             Message::MapMessage(message) => self.map.update(message),
             Message::MaskMessage(message) => self.mask.update(message),
@@ -213,6 +212,7 @@ impl Application for CellSeq {
             Message::OctaveRange(r) => self.info.octave.set_range(r),
             Message::NewNote(r) => self.info.root = r,
             Message::Voices(v) => self.info.voices = v,
+            Message::Quit => return window::close(),
         }
 
         Command::none()
@@ -221,7 +221,7 @@ impl Application for CellSeq {
     fn subscription(&self) -> Subscription<Message> {
         if self.song.is_playing {
             time::every(Duration::from_millis(
-                60000 / (self.song.bpm * self.song.divisor) as u64,
+                240000 / (self.song.bpm * self.song.divisor) as u64,
             ))
             .map(Message::Tick)
         } else {
@@ -237,13 +237,12 @@ impl Application for CellSeq {
             self.mask.view().map(Message::MaskMessage)
         ]
         .align_items(Alignment::Center)
-        .width(Length::Fill)
         .spacing(40)
-        .padding(20);
+        .padding(40);
 
         let bottom = bottom_controls(self.control_message());
 
-        let content = column![top, map, bottom];
+        let content = column![top, map, bottom].width(Length::Fill);
 
         container(content)
             .width(Length::Fill)
