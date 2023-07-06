@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::HashSet, fmt::Display};
 
 use eyre::Result;
 use rand::random;
@@ -38,6 +38,7 @@ impl Default for MidiInfo {
 pub struct MidiLink {
     buffer: Vec<MidiMessage>,
     channel: Sender<u8>,
+    notes_on: HashSet<u8>,
 }
 
 impl Default for MidiLink {
@@ -46,6 +47,7 @@ impl Default for MidiLink {
         Self {
             channel: send,
             buffer: Vec::default(),
+            notes_on: HashSet::default(),
         }
     }
 }
@@ -72,11 +74,28 @@ impl MidiLink {
                 continue;
             } else {
                 count += 1;
-                self.buffer.push(MidiMessage::On {
-                    note: generate_note(info),
-                    velocity: generate_velocity(info.velocity),
-                    channel: info.channel,
-                });
+                let note = generate_note(info);
+
+                if self.notes_on.contains(&note) {
+                    self.notes_on.remove(&note);
+                    self.buffer.push(MidiMessage::Off {
+                        note,
+                        velocity: generate_velocity(info.velocity),
+                        channel: info.channel,
+                    });
+                } else {
+                    if self.notes_on.len() > info.voices.into() {
+                        if let Some(elem) = self.notes_on.iter().next().cloned() {
+                            self.notes_on.remove(&elem);
+                        }
+                    }
+                    self.notes_on.insert(note);
+                    self.buffer.push(MidiMessage::On {
+                        note,
+                        velocity: generate_velocity(info.velocity),
+                        channel: info.channel,
+                    });
+                }
             }
         }
     }
