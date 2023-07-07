@@ -7,6 +7,7 @@ use iced::{
     },
     {Color, Element, Length, Point, Rectangle, Size, Theme},
 };
+use rand::random;
 
 use crate::{Cell, CellMap};
 use itertools::Itertools;
@@ -16,12 +17,26 @@ use rustc_hash::FxHashSet;
 pub enum Message {
     Check(Cell),
     Uncheck(Cell),
+    Ticked,
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct Mask {
     cells: FxHashSet<Cell>,
+    hits: FxHashSet<Cell>,
     mask_cache: Cache,
+    randomness: f32,
+}
+
+impl Default for Mask {
+    fn default() -> Self {
+        Self {
+            cells: FxHashSet::default(),
+            mask_cache: Cache::default(),
+            randomness: 0.5,
+            hits: FxHashSet::default(),
+        }
+    }
 }
 
 impl Mask {
@@ -35,6 +50,7 @@ impl Mask {
                 self.cells.remove(&cell);
                 self.mask_cache.clear();
             }
+            Message::Ticked => self.mask_cache.clear(),
         }
     }
 
@@ -46,13 +62,32 @@ impl Mask {
     }
 
     pub fn tick(&mut self, life: CellMap) -> u8 {
-        let mut hits = 0;
+        self.hits.clear();
         for cell in self.cells.iter() {
             if life.contains(cell) {
-                hits += 1;
+                self.hits.insert(*cell);
             }
         }
-        hits
+        self.hits.len().try_into().unwrap_or_default()
+    }
+
+    pub fn randomize(&mut self) {
+        self.cells.clear();
+        for (i, j) in (-32..=32).cartesian_product(-32..=32) {
+            if random::<f32>() < self.randomness {
+                self.cells.insert(Cell { i, j });
+            }
+        }
+        self.mask_cache.clear();
+    }
+
+    pub fn set_randomness(&mut self, value: f32) {
+        self.randomness = value;
+    }
+
+    pub fn clear(&mut self) {
+        self.cells.clear();
+        self.mask_cache.clear();
     }
 }
 
@@ -79,7 +114,11 @@ impl Program<Message> for Mask {
                         frame.fill_rectangle(
                             Point::new(x.0 as f32, x.1 as f32),
                             Size::UNIT,
-                            Color::WHITE,
+                            if self.hits.contains(&Cell { i: x.1, j: x.0 }) {
+                                Color::from_rgb8(0xFF, 0x00, 0x00)
+                            } else {
+                                Color::WHITE
+                            },
                         );
                     })
             });

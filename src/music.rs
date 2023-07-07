@@ -24,30 +24,8 @@ pub enum Scale {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Octave {
-    center: u8,
-    range: u8,
-}
-
-impl Octave {
-    pub fn new(center: u8, range: u8) -> Self {
-        Self { center, range }
-    }
-
-    pub fn set_center(&mut self, center: u8) {
-        self.center = center;
-    }
-
-    pub fn set_range(&mut self, range: u8) {
-        self.range = range;
-    }
-
-    pub fn center(&self) -> u8 {
-        self.center
-    }
-
-    pub fn range(&self) -> u8 {
-        self.range
-    }
+    pub center: u8,
+    pub range: u8,
 }
 
 impl Default for Octave {
@@ -89,22 +67,8 @@ impl Velocity {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Root {
-    note: RootNote,
-    accidental: Accidental,
-}
-
-impl Root {
-    pub fn new(note: RootNote, accidental: Accidental) -> Self {
-        Self { note, accidental }
-    }
-
-    pub fn get_note(&self) -> RootNote {
-        self.note
-    }
-
-    pub fn get_accidental(&self) -> Accidental {
-        self.accidental
-    }
+    pub note: RootNote,
+    pub accidental: Accidental,
 }
 
 impl Display for Root {

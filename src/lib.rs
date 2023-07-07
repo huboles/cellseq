@@ -96,9 +96,11 @@ pub enum Message {
     NewMap(CellMap),
     HitCount(u8),
     Tick(Instant),
-    Randomize,
+    RandomizeMap,
+    RandomizeMask,
     Reset,
-    Clear,
+    ClearMap,
+    ClearMask,
     Save,
     TogglePlayback,
     SpeedChanged(usize),
@@ -180,6 +182,9 @@ impl Application for CellSeq {
                 let mut commands = Vec::new();
                 commands.push(Command::perform(async move { map }, Message::NewMap));
                 commands.push(Command::perform(midi, |_| Message::None));
+                commands.push(Command::perform(async move {}, |_| {
+                    Message::MaskMessage(mask::Message::Ticked)
+                }));
 
                 return Command::batch(commands);
             }
@@ -195,21 +200,26 @@ impl Application for CellSeq {
                     self.song.step_num = 0;
                 }
             }
-            Message::Clear => self.map.clear(),
-            Message::Randomize => self.map.randomize(),
+            Message::RandChanged(r) => {
+                self.map.set_randomness(r);
+                self.mask.set_randomness(r);
+            }
+            Message::RandomizeMap => self.map.randomize(),
+            Message::RandomizeMask => self.mask.randomize(),
+            Message::ClearMap => self.map.clear(),
+            Message::ClearMask => self.mask.clear(),
             Message::Reset => self.map.reset(),
             Message::Save => self.map.save(),
             Message::SpeedChanged(b) => self.song.bpm = b,
             Message::NewDivision(d) => self.song.divisor = d,
             Message::LoopLength(l) => self.song.loop_len = l,
             Message::ProbChanged(p) => self.info.probability = p,
-            Message::RandChanged(r) => self.map.set_randomness(r),
             Message::NewVMin(v) => self.info.velocity.set_min(v),
             Message::NewVMax(v) => self.info.velocity.set_max(v),
             Message::ChannelChange(c) => self.info.channel = c,
             Message::Scale(s) => self.info.scale = s,
-            Message::NewOctave(o) => self.info.octave.set_center(o),
-            Message::OctaveRange(r) => self.info.octave.set_range(r),
+            Message::NewOctave(o) => self.info.octave.center = o,
+            Message::OctaveRange(r) => self.info.octave.range = r,
             Message::NewNote(r) => self.info.root = r,
             Message::Voices(v) => self.info.voices = v,
             Message::Quit => return window::close(),
@@ -236,9 +246,10 @@ impl Application for CellSeq {
             self.map.view().map(Message::MapMessage),
             self.mask.view().map(Message::MaskMessage)
         ]
+        .width(Length::Fill)
+        .height(Length::Fill)
         .align_items(Alignment::Center)
-        .spacing(40)
-        .padding(40);
+        .spacing(40);
 
         let bottom = bottom_controls(self.control_message());
 

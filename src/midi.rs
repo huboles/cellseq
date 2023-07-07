@@ -25,9 +25,12 @@ impl Default for MidiInfo {
         Self {
             channel: 0,
             velocity: Velocity::new(64, 127),
-            octave: Octave::new(4, 1),
+            octave: Octave::default(),
             scale: Scale::Chromatic,
-            root: Root::new(RootNote::C, Accidental::Natural),
+            root: Root {
+                note: RootNote::C,
+                accidental: Accidental::Natural,
+            },
             voices: 6,
             probability: 0.5,
         }
@@ -71,6 +74,7 @@ impl MidiLink {
             if count > info.voices {
                 break;
             } else if random::<f32>() < info.probability {
+                count += 1;
                 continue;
             } else {
                 count += 1;
