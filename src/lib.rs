@@ -1,9 +1,10 @@
 use iced::{
+    alignment::{Horizontal, Vertical},
     executor,
     theme::Theme,
     time,
-    widget::{column, container, row},
-    window, {Alignment, Application, Command, Element, Length, Point, Subscription},
+    widget::{column, container, row, text, vertical_slider, vertical_space},
+    window, Alignment, {Application, Command, Element, Length, Point, Subscription},
 };
 
 use itertools::Itertools;
@@ -162,7 +163,7 @@ impl Application for CellSeq {
                 return Command::perform(async move { hits }, Message::HitCount);
             }
             Message::Tick(_) => {
-                let map = if self.song.is_looping && self.song.step_num > self.song.loop_len {
+                let map = if self.song.is_looping && self.song.step_num >= self.song.loop_len {
                     self.song.step_num = 0;
                     self.map.reset_loop()
                 } else {
@@ -242,23 +243,41 @@ impl Application for CellSeq {
     fn view(&self) -> Element<Message> {
         let top = top_controls(self.song.is_playing);
 
-        let map = row![
-            self.map.view().map(Message::MapMessage),
-            self.mask.view().map(Message::MaskMessage)
-        ]
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .align_items(Alignment::Center)
-        .spacing(40);
+        let probability_slider = container(
+            column![
+                text(format!("{}", self.info.probability)),
+                vertical_slider(0.0..=100.0, self.info.probability * 100.0, |x| {
+                    Message::ProbChanged(x / 100.0)
+                }),
+                text("note density")
+            ]
+            .height(Length::Fixed(350.0))
+            .align_items(Alignment::Center),
+        )
+        .align_y(Vertical::Top);
+
+        let map = container(
+            row![
+                self.map.view().map(Message::MapMessage),
+                probability_slider,
+                self.mask.view().map(Message::MaskMessage)
+            ]
+            .padding(10)
+            .spacing(20),
+        )
+        .align_x(Horizontal::Center);
 
         let bottom = bottom_controls(self.control_message());
 
-        let content = column![top, map, bottom].width(Length::Fill);
-
-        container(content)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into()
+        container(
+            column![top, vertical_space(40), map, bottom]
+                .width(Length::Fill)
+                .align_items(Alignment::Center),
+        )
+        .align_x(Horizontal::Center)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .into()
     }
 
     fn theme(&self) -> Theme {
