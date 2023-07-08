@@ -247,7 +247,12 @@ impl Display for Scale {
 pub fn generate_note(info: &MidiInfo) -> u8 {
     let root: u8 = info.root.into();
 
-    let oct_mod = random::<u8>() % info.octave.range;
+    let oct_mod = if info.octave.range != 0 {
+        random::<u8>() % info.octave.range
+    } else {
+        0
+    };
+
     let octave = if random::<bool>() {
         info.octave.center.saturating_add(oct_mod)
     } else {

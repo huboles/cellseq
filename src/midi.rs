@@ -91,6 +91,11 @@ impl MidiLink {
                     if self.notes_on.len() > info.voices.into() {
                         if let Some(elem) = self.notes_on.iter().next().cloned() {
                             self.notes_on.remove(&elem);
+                            self.buffer.push(MidiMessage::Off {
+                                note: elem,
+                                velocity: generate_velocity(info.velocity),
+                                channel: info.channel,
+                            });
                         }
                     }
                     self.notes_on.insert(note);
