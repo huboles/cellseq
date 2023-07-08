@@ -102,7 +102,7 @@ impl Program<Message> for Mask {
     ) -> Vec<Geometry> {
         vec![self.mask_cache.draw(bounds.size(), |frame| {
             let background = Path::rectangle(Point::ORIGIN, frame.size());
-            frame.fill(&background, Color::from_rgb8(0x26, 0x26, 0x2E));
+            frame.fill(&background, Color::from_rgb8(0x10, 0x10, 0x10));
 
             frame.with_save(|frame| {
                 frame.scale(Cell::SIZE as f32);
@@ -115,9 +115,9 @@ impl Program<Message> for Mask {
                             Point::new(x.0 as f32, x.1 as f32),
                             Size::UNIT,
                             if self.hits.contains(&Cell { i: x.1, j: x.0 }) {
-                                Color::from_rgb8(0xFF, 0x00, 0x00)
+                                Color::from_rgb8(0xFF, 0xFF, 0xFF)
                             } else {
-                                Color::WHITE
+                                Color::from_rgb8(0xDD, 0xDD, 0xDD)
                             },
                         );
                     })

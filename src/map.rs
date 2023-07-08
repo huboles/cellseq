@@ -168,7 +168,7 @@ impl Program<Message> for Map {
     ) -> Vec<Geometry> {
         vec![self.life_cache.draw(bounds.size(), |frame| {
             let background = Path::rectangle(Point::ORIGIN, frame.size());
-            frame.fill(&background, Color::from_rgb8(0x2E, 0x26, 0x2D));
+            frame.fill(&background, Color::from_rgb8(0x10, 0x10, 0x10));
 
             frame.with_save(|frame| {
                 frame.scale(Cell::SIZE as f32);

@@ -205,7 +205,7 @@ fn midi_vals<'a>(message: ControlMessage) -> Element<'a, Message> {
                 button("-").on_press(Message::ChannelChange(
                     message.info.channel.saturating_sub(1)
                 )),
-                text(format!("{}", message.info.channel)),
+                text(format!("{}", message.info.channel + 1)),
                 button("+").on_press(Message::ChannelChange(
                     message.info.channel.saturating_add(1)
                 )),
