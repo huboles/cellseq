@@ -4,7 +4,7 @@ use iced::{
     theme::Theme,
     time,
     widget::{column, container, row, text, vertical_slider, vertical_space},
-    window, Alignment, {Application, Command, Element, Length, Point, Subscription},
+    window, Alignment, Color, {Application, Command, Element, Length, Point, Subscription},
 };
 
 use itertools::Itertools;
@@ -281,6 +281,12 @@ impl Application for CellSeq {
     }
 
     fn theme(&self) -> Theme {
-        Theme::Dark
+        Theme::custom(iced::theme::Palette {
+            background: Color::from_rgb8(0x15, 0x15, 0x15),
+            text: Color::from_rgb8(0xD7, 0xD0, 0xC7),
+            primary: Color::from_rgb8(0x9B, 0x64, 0xFB),
+            success: Color::from_rgb8(0x42, 0x71, 0x7B),
+            danger: Color::from_rgb8(0xD2, 0x3D, 0x3D),
+        })
     }
 }
