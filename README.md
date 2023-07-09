@@ -1,4 +1,4 @@
-# cellseq v0.1.0
+# cellseq v0.2.1
 
 a cellular automata driven midi sequencer
 
@@ -38,8 +38,8 @@ and range controls how high and low the scale will extend. the two vertical
 sliders on the right give a range of velocities that will be generated.
 
 for each trigger that becomes a note, *cellseq* checks if that note is already
-playing, in which case it sends a note-off, otherwise it sends a note-on on the
-selected midi channel. the number of voices is limited to the selected number,
+playing, in which case it sends a note-off. otherwise it sends a note-on for the
+selected midi channel. the voice count is limited to the selected number,
 and randomly chooses what voice to cut when the limit is hit.
 
 by turning on the loop functionality a small portion of the sequence will be
