@@ -230,7 +230,7 @@ fn randomize_section<'a>(r: f32) -> Element<'a, Message> {
                     Message::RandChanged(x / 100.0)
                 })
                 .width(Length::Fixed(300.0)),
-                text(format!("{r}")),
+                text(format!("{}", (r * 100.0).round())),
             ]
             .spacing(10)
             .align_items(Alignment::Center),

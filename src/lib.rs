@@ -245,7 +245,7 @@ impl Application for CellSeq {
 
         let probability_slider = container(
             column![
-                text(format!("{}", self.info.probability)),
+                text(format!("{}", (self.info.probability * 100.0).round())),
                 vertical_slider(0.0..=100.0, self.info.probability * 100.0, |x| {
                     Message::ProbChanged(x / 100.0)
                 }),

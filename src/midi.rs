@@ -73,7 +73,7 @@ impl MidiLink {
         for _ in 0..hits {
             if count > info.voices {
                 break;
-            } else if random::<f32>() < info.probability {
+            } else if random::<f32>() > info.probability {
                 count += 1;
                 continue;
             } else {
