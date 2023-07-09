@@ -225,11 +225,15 @@ fn randomize_section<'a>(r: f32) -> Element<'a, Message> {
             button("randomize map")
                 .on_press(Message::RandomizeMap)
                 .style(theme::Button::Primary),
-            slider(0.0..=100.0, r * 100.0, |x| {
-                Message::RandChanged(x / 100.0)
-            })
-            .width(Length::Fixed(300.0)),
-            text(format!("{r}")),
+            column![
+                slider(0.0..=100.0, r * 100.0, |x| {
+                    Message::RandChanged(x / 100.0)
+                })
+                .width(Length::Fixed(300.0)),
+                text(format!("{r}")),
+            ]
+            .spacing(10)
+            .align_items(Alignment::Center),
             button("randomize mask")
                 .on_press(Message::RandomizeMask)
                 .style(theme::Button::Primary),
