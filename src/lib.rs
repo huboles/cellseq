@@ -164,7 +164,7 @@ impl Application for CellSeq {
             }
             Message::Tick(_) => {
                 let map = if self.song.is_looping && self.song.step_num >= self.song.loop_len {
-                    self.song.step_num = 0;
+                    self.song.step_num = 1;
                     self.map.reset_loop()
                 } else {
                     self.song.step_num += 1;
@@ -174,6 +174,9 @@ impl Application for CellSeq {
                 let channel = self.midi.channel_handle();
                 let bytes = self.midi.tick();
 
+                let new_map = map.clone();
+                let hits = self.mask.tick(map);
+
                 let midi = tokio::spawn(async move {
                     for byte in bytes {
                         channel.send(byte).await.unwrap()
@@ -181,8 +184,9 @@ impl Application for CellSeq {
                 });
 
                 let mut commands = Vec::new();
-                commands.push(Command::perform(async move { map }, Message::NewMap));
                 commands.push(Command::perform(midi, |_| Message::None));
+                commands.push(Command::perform(async move { new_map }, Message::NewMap));
+                commands.push(Command::perform(async move { hits }, Message::HitCount));
                 commands.push(Command::perform(async move {}, |_| {
                     Message::MaskMessage(mask::Message::Ticked)
                 }));
@@ -190,15 +194,20 @@ impl Application for CellSeq {
                 return Command::batch(commands);
             }
             Message::TogglePlayback => {
-                self.song.is_playing = !self.song.is_playing;
                 if self.song.is_playing {
-                    self.map.save()
+                    let bytes = self.midi.all_off(self.info.channel);
+                    let channel = self.midi.channel_handle();
+                    for byte in bytes {
+                        channel.try_send(byte).unwrap();
+                    }
                 }
+                self.song.is_playing = !self.song.is_playing;
             }
             Message::ToggleLoop => {
                 self.song.is_looping = !self.song.is_looping;
                 if self.song.is_looping {
-                    self.song.step_num = 0;
+                    self.map.set_loop();
+                    self.song.step_num = 1;
                 }
             }
             Message::RandChanged(r) => {

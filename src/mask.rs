@@ -68,7 +68,8 @@ impl Mask {
                 self.hits.insert(*cell);
             }
         }
-        self.hits.len().try_into().unwrap_or_default()
+
+        self.hits.len().try_into().unwrap_or(127)
     }
 
     pub fn randomize(&mut self) {

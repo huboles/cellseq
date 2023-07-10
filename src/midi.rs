@@ -120,6 +120,26 @@ impl MidiLink {
         self.buffer.clear();
         vec
     }
+
+    pub fn all_off(&mut self, channel: u8) -> Vec<u8> {
+        let notes = self
+            .notes_on
+            .iter()
+            .flat_map(|note| {
+                MidiMessage::Off {
+                    note: *note,
+                    velocity: 0,
+                    channel,
+                }
+                .as_bytes()
+            })
+            .flatten()
+            .flatten()
+            .collect();
+
+        self.notes_on.clear();
+        notes
+    }
 }
 
 #[derive(Clone, Copy, Debug, Error)]

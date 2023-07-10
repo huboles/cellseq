@@ -17,6 +17,7 @@ use std::fmt::Debug;
 #[derive(Debug)]
 pub struct Map {
     seed: CellMap,
+    loop_point: CellMap,
     cells: CellMap,
     life_cache: Cache,
     randomness: f32,
@@ -27,6 +28,7 @@ impl Default for Map {
         Self {
             seed: CellMap::default(),
             cells: CellMap::default(),
+            loop_point: CellMap::default(),
             life_cache: Cache::default(),
             randomness: 0.5,
         }
@@ -41,8 +43,12 @@ pub enum Message {
 }
 
 impl Map {
+    pub fn set_loop(&mut self) {
+        self.loop_point = self.cells.clone();
+    }
+
     pub fn reset_loop(&mut self) -> CellMap {
-        self.seed.clone()
+        self.loop_point.clone()
     }
 
     pub fn tick(&self) -> CellMap {
