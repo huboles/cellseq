@@ -1,4 +1,4 @@
-# cellseq v0.2.1
+# cellseq v0.2.2
 
 a cellular automata driven midi sequencer
 
