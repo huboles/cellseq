@@ -1,4 +1,4 @@
-# cellseq v0.2.2
+# cellseq v0.2.3
 
 a cellular automata driven midi sequencer
 
@@ -14,6 +14,8 @@ a cellular automata driven midi sequencer
 - install `$ cargo install --path .`
 
 ## usage
+
+![example session](https://huck.website/videos/cellseq.mp4)
 
 *cellseq* consists of two interactive grids, refered to as the map (on the right)
 and the mask (on the left). clicking inside either one toggles the selected grid
