@@ -159,7 +159,7 @@ impl Application for CellSeq {
             Message::HitCount(x) => self.midi.update(x, &self.info),
             Message::NewMap(m) => {
                 self.map.update(map::Message::Ticked(m.clone()));
-                let hits = self.mask.tick(m);
+                let hits = self.mask.tick(m, self.info.voices);
                 return Command::perform(async move { hits }, Message::HitCount);
             }
             Message::Tick(_) => {
@@ -175,7 +175,7 @@ impl Application for CellSeq {
                 let bytes = self.midi.tick();
 
                 let new_map = map.clone();
-                let hits = self.mask.tick(map);
+                let hits = self.mask.tick(map, self.info.voices);
 
                 let midi = tokio::spawn(async move {
                     for byte in bytes {

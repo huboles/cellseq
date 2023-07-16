@@ -61,7 +61,7 @@ impl Mask {
             .into()
     }
 
-    pub fn tick(&mut self, life: CellMap) -> u8 {
+    pub fn tick(&mut self, life: CellMap, voices: u8) -> u8 {
         self.hits.clear();
         for cell in self.cells.iter() {
             if life.contains(cell) {
@@ -69,7 +69,7 @@ impl Mask {
             }
         }
 
-        self.hits.len().try_into().unwrap_or(127)
+        self.hits.len().try_into().unwrap_or(127) % voices
     }
 
     pub fn randomize(&mut self) {
